@@ -1,0 +1,1869 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Lesetext-Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'Nunito', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: #edeae4; color: #1a1a1a; min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+.app { max-width: 960px; margin: 0 auto; padding: 32px 16px 80px; }
+
+/* ═══ Header ═══ */
+.header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 28px; }
+.header h1 {
+  font-size: 20px; font-weight: 800; letter-spacing: -0.02em; color: #2a2520;
+  display: flex; align-items: baseline; gap: 8px;
+}
+.header h1 .h1-sub { font-size: 13px; font-weight: 600; color: #b0a898; letter-spacing: 0; padding-bottom: 1px; }
+.header p { font-size: 12px; color: #b8b0a8; margin-top: 4px; font-weight: 500; }
+
+.btn-settings {
+  display: inline-flex; align-items: center; gap: 7px; position: relative; flex-shrink: 0;
+  padding: 8px 14px; border-radius: 10px; border: 1.5px solid #dedad4; background: #f5f3ef;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: #777; cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.btn-settings:hover { border-color: #b5b0aa; background: #eeebe6; }
+.btn-settings .settings-dot {
+  position: absolute; top: -4px; right: -4px; width: 8px; height: 8px; border-radius: 50%;
+  background: #e8a020; border: 2px solid #edeae4;
+}
+.btn-settings .settings-dot.hidden { display: none; }
+
+/* ═══ Layout ═══ */
+.layout { display: grid; grid-template-columns: 1fr 268px; gap: 16px; align-items: start; }
+@media (max-width: 700px) { .layout { grid-template-columns: 1fr; } }
+.side-col { display: flex; flex-direction: column; gap: 12px; }
+
+.card {
+  background: #fff; border: 0.5px solid rgba(0,0,0,0.08); border-radius: 18px;
+  padding: 22px; box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+}
+.card.compact { padding: 16px 18px; }
+.card-title {
+  font-size: 10px; font-weight: 800; color: #c0bab3; text-transform: uppercase;
+  letter-spacing: .10em; margin-bottom: 18px;
+}
+.card.compact .card-title { margin-bottom: 14px; }
+
+/* ═══ Sound chips ═══ */
+.group-label {
+  font-size: 10px; font-weight: 700; color: #d0cbc4; text-transform: uppercase;
+  letter-spacing: .08em; margin: 16px 0 9px;
+}
+.group-label:first-of-type { margin-top: 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 38px; padding: 5px 12px; border-radius: 100px;
+  border: 1.5px solid #dedad4; background: #f8f7f4;
+  font-family: inherit; font-size: 15px; font-weight: 700; line-height: 1.3;
+  color: #5a5650; cursor: pointer; user-select: none;
+  transition: border-color .12s, background .12s, color .12s, transform .08s;
+}
+.chip:hover { border-color: #b5b0aa; background: #eeebe6; }
+.chip:active { transform: scale(.94); }
+.chip.on { background: #eaf5ee; border-color: #38a86d; color: #1c6b41; }
+.chip.on:hover { background: #dff0e7; border-color: #2d9a65; }
+
+/* ═══ Parameter sliders ═══ */
+.setting { margin-bottom: 14px; }
+.setting-label {
+  font-size: 13px; color: #888; font-weight: 500;
+  display: flex; justify-content: space-between; margin-bottom: 6px;
+}
+.setting-label strong { color: #222; font-weight: 700; }
+input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
+
+.selected-pills {
+  padding: 7px 10px; background: #f7f5f2; border: 1px solid #eeebe6; border-radius: 8px;
+  font-size: 11px; color: #b0aba4; line-height: 1.7; margin-bottom: 14px; word-break: break-all;
+}
+
+.btn-generate {
+  width: 100%; padding: 11px 0; font-family: inherit; font-size: 15px; font-weight: 800;
+  background: #2d9a65; color: #fff; border: none; border-radius: 12px; cursor: pointer;
+  letter-spacing: .01em; box-shadow: 0 3px 12px rgba(45,154,101,.28);
+  transition: box-shadow .15s, background .15s, transform .1s;
+}
+.btn-generate:hover:not(:disabled) { background: #278a5a; }
+.btn-generate:active:not(:disabled) { transform: scale(.98); }
+.btn-generate:disabled { background: #a8cfc0; box-shadow: none; cursor: not-allowed; }
+
+/* ═══ Eigenes Thema ═══ */
+.topic-input {
+  width: 100%; box-sizing: border-box; padding: 8px 11px; font-size: 13px;
+  font-family: inherit; color: #333; border: 1.5px solid #e0dbd4; border-radius: 10px;
+  outline: none; transition: border-color .13s;
+}
+.topic-input:focus { border-color: #2d9a65; }
+
+/* ═══ Hint card ═══ */
+.hint-card {
+  padding: 11px 14px; border-radius: 13px; background: #f7f5f2; border: 1px solid #e8e4dc;
+  font-size: 12px; color: #b0aba4; line-height: 1.7;
+}
+.hint-card .hint-key { color: #888; font-weight: 600; }
+.hint-card .hint-val { font-weight: 700; color: #666; }
+.hint-card .hint-warn { color: #d08020; font-weight: 700; }
+.hint-link {
+  margin-top: 2px; font-family: inherit; font-size: 11px; font-weight: 700; color: #2d9a65;
+  background: none; border: none; padding: 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* ═══ Settings modal ═══ */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.30);
+  -webkit-backdrop-filter: blur(4px); backdrop-filter: blur(4px);
+  z-index: 100; overflow-y: auto; padding: 24px 16px 40px;
+  animation: fadein .15s ease; display: none;
+}
+.modal-overlay.open { display: block; }
+@keyframes fadein { from { opacity: 0 } to { opacity: 1 } }
+.modal-box {
+  background: #fff; border-radius: 20px; width: 100%; max-width: 480px; margin: 0 auto;
+  box-shadow: 0 24px 64px rgba(0,0,0,.18); padding: 28px; animation: slidein .18s ease;
+}
+@keyframes slidein { from { transform: translateY(10px); opacity: 0 } to { transform: none; opacity: 1 } }
+.modal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 22px; }
+.modal-head h2 { font-size: 17px; font-weight: 800; letter-spacing: -0.01em; }
+.modal-head p { font-size: 12px; color: #a09890; margin-top: 3px; font-weight: 500; }
+.modal-close {
+  width: 30px; height: 30px; border-radius: 50%; border: none; background: #f2efea;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  color: #888; font-size: 16px; flex-shrink: 0; font-family: inherit;
+}
+.modal-close:hover { background: #e8e4dc; }
+.modal-label {
+  font-size: 10px; font-weight: 800; color: #c0bab3; text-transform: uppercase;
+  letter-spacing: .10em; margin-bottom: 10px;
+}
+
+.api-bar {
+  display: flex; align-items: center; gap: 10px; background: #f8f6f2;
+  border: 1.5px solid #e0dbd4; border-radius: 10px; padding: 10px 14px; margin-bottom: 20px;
+  transition: border-color .2s;
+}
+.api-bar.filled { border-color: #38a86d; }
+.api-bar input {
+  flex: 1; min-width: 0; border: none; outline: none; font-size: 14px;
+  font-family: 'SF Mono','Fira Code',monospace; color: #333; background: transparent;
+}
+.key-dot { width: 8px; height: 8px; border-radius: 50%; background: #dedad4; transition: background .25s; flex-shrink: 0; }
+.key-dot.active { background: #2d9a65; }
+
+.key-remember {
+  display: flex; align-items: center; gap: 9px; margin: -12px 0 20px; padding: 0 2px;
+  font-size: 12px; color: #999;
+}
+.key-remember input[type=checkbox] { width: 14px; height: 14px; accent-color: #2d9a65; cursor: pointer; flex-shrink: 0; }
+.key-remember label { cursor: pointer; }
+.key-forget {
+  margin-left: auto; font-family: inherit; font-size: 11px; font-weight: 700; color: #c05050;
+  background: none; border: none; padding: 0; cursor: pointer;
+  text-decoration: underline; text-underline-offset: 2px;
+}
+.key-forget[hidden] { display: none; }
+
+.humor-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 20px; }
+.humor-btn {
+  padding: 10px 9px 8px; border-radius: 11px; border: 1.5px solid #e6e2db; background: #f8f7f4;
+  cursor: pointer; text-align: left; color: #555; font-family: inherit; line-height: 1.3;
+  transition: border-color .12s, background .12s;
+}
+.humor-btn .hicon { font-size: 20px; display: block; margin-bottom: 4px; }
+.humor-btn .hlabel { font-weight: 700; font-size: 13px; display: block; }
+.humor-btn .hdesc { color: #b0aba4; font-size: 11px; }
+.humor-btn:hover { border-color: #b5b0aa; background: #eeebe6; }
+.humor-btn.active { background: #fef9ee; border-color: #e0a020; color: #6e4300; }
+.humor-btn.active .hdesc { color: #a07030; }
+
+.schema-box {
+  display: flex; align-items: flex-start; gap: 10px; cursor: pointer;
+  padding: 11px 13px; border-radius: 10px; border: 1.5px solid #e8e4dc;
+  background: #f8f6f2; margin-bottom: 22px;
+}
+.schema-box input[type=checkbox] { margin-top: 3px; width: 15px; height: 15px; accent-color: #2d9a65; cursor: pointer; flex-shrink: 0; }
+.schema-box label { cursor: pointer; }
+.schema-box .schema-title { font-size: 13px; font-weight: 700; color: #444; margin-bottom: 2px; }
+.schema-box .schema-steps { color: #aaa; font-size: 12px; display: block; }
+
+.variant-row { display: flex; gap: 6px; margin-bottom: 8px; }
+.variant-btn {
+  flex: 1; padding: 9px 6px; border-radius: 10px; border: 1.5px solid #e6e2db;
+  background: #f8f7f4; color: #666; font-family: inherit; font-size: 13px; font-weight: 700;
+  cursor: pointer; transition: border-color .12s, background .12s, color .12s;
+}
+.variant-btn:hover { border-color: #b5b0aa; background: #eeebe6; }
+.variant-btn.active { background: #eaf5ee; border-color: #38a86d; color: #1c6b41; }
+.variant-note { font-size: 11px; color: #b0aba4; line-height: 1.6; margin-bottom: 22px; }
+
+.variant-bar { display: none; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 12px; }
+.variant-bar.visible { display: flex; }
+.variant-bar .vb-label { font-size: 11px; font-weight: 800; color: #c0bab3; text-transform: uppercase; letter-spacing: .08em; }
+.vb-btn {
+  padding: 5px 12px; border-radius: 100px; border: 1.5px solid #dedad4; background: #fff;
+  font-family: inherit; font-size: 12px; font-weight: 700; color: #777; cursor: pointer;
+  transition: border-color .12s, background .12s, color .12s;
+}
+.vb-btn:hover { border-color: #b5b0aa; background: #f5f3ef; }
+.vb-btn.active { background: #eaf5ee; border-color: #38a86d; color: #1c6b41; }
+.vb-btn .vb-flag { font-size: 11px; margin-left: 4px; }
+.vb-reason { font-size: 12px; color: #b0aba4; font-style: italic; }
+
+.btn-modal-ok {
+  width: 100%; padding: 13px 0; font-family: inherit; font-size: 15px; font-weight: 800;
+  background: #2d9a65; color: #fff; border: none; border-radius: 12px; cursor: pointer;
+  box-shadow: 0 3px 12px rgba(45,154,101,.28); letter-spacing: .01em;
+}
+.btn-modal-ok:hover { background: #278a5a; }
+
+/* ═══ Output ═══ */
+.output-area { margin-top: 20px; }
+
+/* Progress bar for correction attempts */
+.correction-progress { display: none; margin-bottom: 12px; }
+.correction-progress.visible { display: block; }
+.cp-label { font-size: 12px; color: #aaa; margin-bottom: 5px; display: flex; justify-content: space-between; font-weight: 500; }
+.cp-label span:last-child { font-weight: 700; color: #888; }
+.cp-track { height: 4px; background: #e8e4dc; border-radius: 10px; overflow: hidden; }
+.cp-fill { height: 100%; background: #e8a020; border-radius: 10px; transition: width .4s; }
+.cp-fill.done { background: #2d9a65; }
+.cp-fill.failed { background: #c94040; }
+
+.status-bar { font-size: 13px; padding: 10px 14px; border-radius: 10px; margin-bottom: 12px; display: none; align-items: center; gap: 8px; }
+.status-bar.visible { display: flex; }
+.status-bar.info { background: #eef3fd; color: #2a55b5; }
+.status-bar.ok   { background: #eaf6f0; color: #1a6640; }
+.status-bar.warn { background: #fff8e6; color: #7a5000; }
+.status-bar.err  { background: #fdf0f0; color: #a32020; }
+
+/* Story display */
+.story-wrap {
+  background: #fffef5; border: 1.5px solid #e8e0b0; border-radius: 20px;
+  padding: 32px 36px; min-height: 120px; box-shadow: 0 2px 12px rgba(0,0,0,0.05);
+}
+.story-wrap.empty-state { display: flex; align-items: center; justify-content: center; min-height: 160px; padding: 40px 32px; }
+.empty-hint { text-align: center; color: #d8d0c4; }
+.empty-hint .big { font-size: 42px; margin-bottom: 12px; }
+.empty-hint p { font-size: 14px; font-weight: 500; }
+
+.humor-tag {
+  display: inline-flex; align-items: center; gap: 5px; margin-bottom: 20px; padding: 4px 12px;
+  background: #fff8e8; border: 1px solid #e8c870; border-radius: 100px;
+  font-size: 12px; color: #7a4a00; font-weight: 700;
+}
+
+.story-line { margin-bottom: 0.41em; }
+.story-line:last-child { margin-bottom: 0; }
+.story-text { font-size: 30px; line-height: 1.61; font-family: 'Nunito', sans-serif; font-weight: 600; word-spacing: .08em; letter-spacing: 0.02em; }
+.syl-a { color: #1a5cb5; }
+.syl-b { color: #c05a00; }
+.punct  { color: #555; }
+
+/* Bad word highlighting — clickable for synonyms */
+.bad-word {
+  background: #fde8e8; border-radius: 4px; border-bottom: 2px solid #d44;
+  cursor: pointer; position: relative; transition: background .1s;
+}
+.bad-word:hover { background: #fcd0d0; }
+.bad-word .bad-laut { font-size: 10px; color: #c33; vertical-align: super; font-family: 'Nunito', sans-serif; font-weight: 700; margin-left: 1px; }
+
+.syl-legend {
+  display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  margin-top: 22px; padding-top: 16px; border-top: 1px solid #ede8cc;
+  font-size: 12px; color: #bbb;
+}
+.syl-legend > span:first-child { color: #c0b898; font-weight: 600; }
+.syl-legend-item { display: flex; align-items: center; gap: 5px; }
+.syl-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Editable word (all words clickable) */
+.editable-word {
+  cursor: pointer; border-radius: 4px; padding: 0 2px;
+  transition: background .1s; position: relative; display: inline;
+}
+.editable-word:hover { background: rgba(45,154,101,0.12); }
+
+/* Inline edit input */
+.inline-edit-wrap { display: inline-flex; flex-direction: column; align-items: flex-start; vertical-align: baseline; position: relative; }
+.inline-edit-input {
+  font-family: 'Nunito', sans-serif; font-size: 28px; font-weight: 600;
+  border: 2px solid #2d9a65; border-radius: 7px; outline: none;
+  padding: 2px 7px; background: #fff; color: #1a5cb5;
+  min-width: 60px; line-height: 1.4; letter-spacing: 0.02em;
+  box-shadow: 0 2px 12px rgba(45,154,101,0.2);
+}
+.inline-edit-input.edit-invalid { border-color: #d44; color: #c33; box-shadow: 0 2px 12px rgba(204,51,51,0.15); }
+.inline-edit-hint {
+  font-family: 'Nunito', sans-serif; font-size: 11px; font-weight: 700;
+  position: absolute; top: 100%; left: 0; white-space: nowrap;
+  padding: 3px 8px; border-radius: 6px; margin-top: 3px;
+  pointer-events: none; z-index: 10;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.inline-edit-hint.valid { background: #eaf6f0; color: #1d7048; }
+.inline-edit-hint.invalid { background: #fde8e8; color: #c33; }
+.inline-edit-hint.neutral { background: #f0ede8; color: #888; }
+
+/* Synonym popover */
+.syn-popover {
+  position: fixed; z-index: 9999;
+  background: #fff; border: 1px solid rgba(0,0,0,0.11);
+  border-radius: 16px; padding: 16px 18px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.15);
+  min-width: 260px; max-width: 320px;
+  display: none;
+}
+.syn-popover.open { display: block; }
+.syn-header { font-size: 10px; font-weight: 800; color: #c0bab3; text-transform: uppercase; letter-spacing: .10em; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+.syn-close { cursor: pointer; font-size: 15px; color: #c0bab3; line-height: 1; padding: 0 2px; }
+.syn-close:hover { color: #888; }
+.syn-word { font-size: 16px; font-weight: 700; color: #c33; margin-bottom: 3px; font-family: 'Nunito', sans-serif; }
+.syn-reason { font-size: 11px; color: #e06060; margin-bottom: 12px; }
+.syn-loading { font-size: 13px; color: #bbb; padding: 8px 0; }
+.syn-list { display: flex; flex-direction: column; gap: 5px; }
+.syn-option {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 7px 10px; border-radius: 9px; border: 1px solid #e8e4dc;
+  background: #f8f6f2; cursor: pointer; transition: background .1s, border-color .1s;
+  font-size: 16px; font-family: 'Nunito', sans-serif; font-weight: 600;
+}
+.syn-option:hover { background: #edf7f2; border-color: #3aaa73; }
+.syn-option .syn-badge { font-size: 10px; font-family: 'Nunito', sans-serif; color: #2d9a65; font-weight: 700; background: #d8f0e5; padding: 2px 7px; border-radius: 10px; }
+.syn-option.invalid { opacity: .42; cursor: not-allowed; }
+.syn-option.invalid .syn-badge { background: #fde8e8; color: #c33; }
+.syn-empty { font-size: 13px; color: #bbb; padding: 4px 0; }
+
+/* Manual input in synonym popover */
+.syn-manual { margin-top: 12px; border-top: 1px solid #f0ede8; padding-top: 12px; }
+.syn-manual-label { font-size: 10px; font-weight: 800; color: #c0bab3; text-transform: uppercase; letter-spacing: .10em; margin-bottom: 8px; }
+.syn-manual-row { display: flex; gap: 6px; }
+.syn-manual-input {
+  flex: 1; min-width: 0; padding: 7px 10px; border-radius: 9px; border: 1.5px solid #e0dbd4;
+  font-size: 15px; font-family: 'Nunito', sans-serif; font-weight: 600; outline: none; background: #f8f6f2;
+  transition: border-color .15s;
+}
+.syn-manual-input:focus { border-color: #2d9a65; background: #fff; }
+.syn-manual-input.input-invalid:focus { border-color: #d44; }
+.syn-manual-btn {
+  padding: 7px 12px; border-radius: 9px; border: 1.5px solid #2d9a65;
+  background: #edf7f2; color: #1d7048; font-weight: 700; font-size: 13px;
+  cursor: pointer; transition: background .13s; white-space: nowrap; font-family: inherit;
+}
+.syn-manual-btn:hover:not(:disabled) { background: #d8f0e5; }
+.syn-manual-btn:disabled { opacity: .4; cursor: not-allowed; border-color: #ddd8d0; background: #f0ede8; color: #c0bab3; }
+.syn-manual-feedback { margin-top: 5px; font-size: 11px; font-weight: 700; min-height: 16px; transition: color .15s; }
+.syn-manual-feedback.valid { color: #1d7048; }
+.syn-manual-feedback.invalid { color: #c33; }
+
+/* Restart correction button */
+.btn-restart { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; margin-left: 8px; padding: 8px 16px; font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 9px; border: 1.5px solid #2d9a65; background: #edf7f2; color: #1d7048; cursor: pointer; transition: background .13s; }
+.btn-restart:hover { background: #d8f0e5; }
+.btn-restart:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Validation box */
+.validation-box { margin-top: 14px; padding: 14px 18px; border-radius: 14px; border: 1px solid; }
+.validation-box.ok  { background: #eaf6f0; border-color: #9ecfb5; color: #1a6640; font-size: 14px; font-weight: 600; padding: 12px 18px; }
+.validation-box.fail { background: #fdf0f0; border-color: #e8a0a0; }
+.validation-box.fail .v-title { font-size: 14px; font-weight: 700; color: #a32020; margin-bottom: 6px; }
+.v-hint { font-size: 12px; color: #c05050; margin-bottom: 9px; }
+.err-list { list-style: none; font-size: 13px; color: #7a2020; }
+.err-list li { padding: 2px 0; }
+.err-list li::before { content: "✗  "; }
+.btn-retry { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 8px 16px; font-family: inherit; font-size: 13px; font-weight: 600; border-radius: 9px; border: 1.5px solid #e08080; background: #fff; color: #c33; cursor: pointer; transition: background .13s; }
+.btn-retry:hover { background: #fdf0f0; }
+.btn-retry:disabled { opacity: .4; cursor: not-allowed; }
+
+/* Export bar */
+.export-bar { display: none; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+.export-bar.visible { display: flex; }
+.btn-export {
+  display: inline-flex; align-items: center; gap: 7px;
+  padding: 9px 18px; border-radius: 10px; border: 1.5px solid #dedad4;
+  background: #fff; font-family: 'Nunito', sans-serif; font-size: 14px; font-weight: 700;
+  cursor: pointer; transition: all .13s; color: #555; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.btn-export:hover { background: #f8f7f4; border-color: #b5b0aa; transform: translateY(-1px); box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+.btn-export:active { transform: scale(.98); }
+.btn-print:hover { border-color: #2d9a65; color: #1d7048; background: #edf7f2; }
+.btn-pdf:hover   { border-color: #c05a00; color: #8a3a00; background: #fff5ec; }
+
+/* ═══ Touch-Geräte (iPad) ═══
+   Safari zoomt automatisch hinein, sobald ein fokussiertes Eingabefeld
+   kleiner als 16px ist. Nur dort hochsetzen, Desktop bleibt unverändert. */
+@media (pointer: coarse) {
+  .topic-input, .api-bar input, .syn-manual-input { font-size: 16px; }
+}
+
+/* ═══ Scrollbars ═══ */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,.12); border-radius: 3px; }
+
+/* ═══ Print styles ═══ */
+@media print {
+  body { background: #fff !important; }
+  .header, .layout, .status-bar, .correction-progress,
+  .export-bar, #validation-out, .syn-popover, .syl-legend,
+  .humor-tag, .inline-edit-wrap, .modal-overlay, .variant-bar { display: none !important; }
+  .output-area { margin-top: 0 !important; }
+  .app { max-width: 100%; padding: 0; }
+  .story-wrap {
+    border: none !important; background: #fff !important;
+    padding: 20mm 15mm !important; box-shadow: none !important;
+    min-height: auto !important;
+  }
+  .story-wrap.empty-state { display: none !important; }
+  .story-text { font-size: 24pt !important; line-height: 2.0 !important; }
+  .bad-word { background: none !important; border-bottom: none !important; }
+  .bad-word .bad-laut { display: none !important; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="header">
+    <div>
+      <h1>Lesetext-Generator <span class="h1-sub">für Erstleser</span></h1>
+      <p>Mildenberger-Silbenfärbung · nur bekannte Laute · immer neue Texte</p>
+    </div>
+    <button class="btn-settings" id="btn-settings" title="Einstellungen">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+      Einstellungen
+      <span class="settings-dot" id="settings-dot"></span>
+    </button>
+  </div>
+
+  <div class="layout">
+    <div class="card" id="sound-card"><div class="card-title">Bekannte Laute</div></div>
+
+    <div class="side-col">
+      <div class="card compact">
+        <div class="card-title">Parameter</div>
+        <div class="setting">
+          <div class="setting-label">Max. Wortlänge <strong><span id="wl-val">6</span> Buchst.</strong></div>
+          <input type="range" id="wordlen" min="2" max="12" value="6" step="1">
+        </div>
+        <div class="setting">
+          <div class="setting-label">Textlänge ca. <strong><span id="tl-val">40</span> Wörter</strong></div>
+          <input type="range" id="textlen" min="10" max="120" value="40" step="5">
+        </div>
+        <div class="selected-pills" id="selected-display">–</div>
+        <button class="btn-generate" id="btn-gen">✨ Text erstellen</button>
+      </div>
+
+      <div class="card compact">
+        <div class="card-title">Eigenes Thema</div>
+        <input type="text" class="topic-input" id="custom-topic" placeholder="z. B. Dinosaurier, Fußball …" autocomplete="off">
+      </div>
+
+      <div class="hint-card">
+        <div id="hint-humor"><span class="hint-key">Textart:</span> <span class="hint-val" id="hint-humor-val"></span></div>
+        <div id="hint-apikey"><span class="hint-warn">⚠ API-Key nicht gesetzt</span></div>
+        <button class="hint-link" id="hint-settings-link">Einstellungen →</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="output-area">
+    <div id="status-bar" class="status-bar"></div>
+
+    <div class="correction-progress" id="cp">
+      <div class="cp-label">
+        <span id="cp-text">Korrektur läuft…</span>
+        <span id="cp-count"></span>
+      </div>
+      <div class="cp-track"><div class="cp-fill" id="cp-fill" style="width:0%"></div></div>
+    </div>
+
+    <div class="variant-bar" id="variant-bar"></div>
+
+    <div class="story-wrap empty-state" id="story-wrap">
+      <div class="empty-hint">
+        <div class="big">📚</div>
+        <p>Laute auswählen, dann auf „Text erstellen" klicken.</p>
+      </div>
+    </div>
+    <div class="export-bar" id="export-bar">
+      <button class="btn-export btn-print" id="btn-print" onclick="printStory()">🖨️ Drucken</button>
+      <button class="btn-export btn-pdf" id="btn-pdf" onclick="exportPDF()">📄 Als PDF speichern</button>
+    </div>
+    <div id="validation-out"></div>
+  </div>
+</div>
+
+<!-- Einstellungen-Modal: API-Key, Textart, Gerüst -->
+<div class="modal-overlay" id="settings-modal">
+  <div class="modal-box" id="settings-box">
+    <div class="modal-head">
+      <div>
+        <h2>Einstellungen</h2>
+        <p>API-Key, Textart und Struktur</p>
+      </div>
+      <button class="modal-close" id="settings-close" title="Schließen">✕</button>
+    </div>
+
+    <div class="modal-label">OpenAI API-Key</div>
+    <div class="api-bar" id="api-bar">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#b0aca5" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+        <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4"></path>
+      </svg>
+      <input type="password" id="api-key" placeholder="sk-…" autocomplete="off">
+      <div class="key-dot" id="key-dot"></div>
+    </div>
+
+    <div class="key-remember">
+      <input type="checkbox" id="remember-key">
+      <label for="remember-key">Auf diesem Gerät speichern</label>
+      <button class="key-forget" id="forget-key" hidden>Vom Gerät löschen</button>
+    </div>
+
+    <div class="modal-label">Textart</div>
+    <div class="humor-grid" id="humor-grid"></div>
+
+    <label class="schema-box" for="story-schema">
+      <input type="checkbox" id="story-schema">
+      <span>
+        <span class="schema-title">Mit Wunsch–Hindernis–Lösung strukturieren</span>
+        <span class="schema-steps">Zusätzliches Gerüst – der Witzmechanismus bleibt unverändert.</span>
+      </span>
+    </label>
+
+    <div class="modal-label">Varianten</div>
+    <div class="variant-row" id="variant-row">
+      <button class="variant-btn active" data-n="1">Aus</button>
+      <button class="variant-btn" data-n="2">2 Texte</button>
+      <button class="variant-btn" data-n="3">3 Texte</button>
+    </div>
+    <div class="variant-note">Erzeugt mehrere Texte parallel und lässt die KI den spannendsten auswählen. Du kannst danach jederzeit umschalten. Kostet entsprechend mehr API-Aufrufe.</div>
+
+    <button class="btn-modal-ok" id="settings-apply">Übernehmen</button>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
+
+<!-- Synonym Popover -->
+<div class="syn-popover" id="syn-popover">
+  <div class="syn-header">
+    <span>Synonymwerkzeug</span>
+    <span class="syn-close" id="syn-close">✕</span>
+  </div>
+  <div class="syn-word" id="syn-word"></div>
+  <div class="syn-reason" id="syn-reason"></div>
+  <div id="syn-body"><div class="syn-loading">Suche Alternativen…</div></div>
+  <div class="syn-manual">
+    <div class="syn-manual-label">Eigenes Wort eingeben</div>
+    <div class="syn-manual-row">
+      <input type="text" class="syn-manual-input" id="syn-manual-input" placeholder="Eigenes Wort…" autocomplete="off">
+      <button class="syn-manual-btn" id="syn-manual-btn" disabled>Ersetzen</button>
+    </div>
+    <div class="syn-manual-feedback" id="syn-manual-feedback"></div>
+  </div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════
+   HUMOR TYPES
+══════════════════════════════════════════ */
+const HUMOR_TYPES = [
+  {
+    id:"keiner", icon:"\u{1F4D6}", label:"Keine Vorgabe", desc:"Einfache Geschichte",
+    prompt:``
+  },
+  {
+    id:"scherzfrage", icon:"❓", label:"Scherzfrage", desc:"Frage + Überraschung",
+    prompt:`WITZMECHANISMUS – Scherzfrage:
+Baue eine kurze Geschichte, die in einer Scherzfrage endet. Die Antwort muss logisch korrekt aber völlig unerwartet sein.
+Klassisches Prinzip: "Warum summen Bienen? – Weil sie den Text nicht kennen."
+→ Frage klingt ernst, Antwort leuchtet ein, ist aber überraschend.
+Spannung aufbauen BEVOR die Frage kommt. Pointe ganz ans Ende.`
+  },
+  {
+    id:"wortspiel", icon:"🔤", label:"Wortspiel", desc:"Kalauer / Doppelbedeutung",
+    prompt:`WITZMECHANISMUS – Wortspiel / Kalauer:
+Ein Wort oder Satz wird wörtlich statt übertragen verstanden (oder umgekehrt).
+Beispiel-Prinzip: "Beim Bäcker angerufen – nur die Mehlbox dran!"
+→ Der Kalauer darf FLACH sein – bei Kindern ist das Pflicht. Stöhnen und Augenrollen gehört dazu.
+Das Wortspiel kommt als letzter Satz – die Pointe knallt ganz am Ende.`
+  },
+  {
+    id:"absurd", icon:"🌀", label:"Absurde Situation", desc:"Verrückt, aber konsequent",
+    prompt:`WITZMECHANISMUS – Absurde Situation:
+Nimm eine alltägliche Situation, drehe eine Kleinigkeit komplett auf den Kopf – und alle Figuren behandeln das als völlig normal.
+Beispiel-Prinzip: Zahnstocher sehen Igel → "Ich wusste nicht, dass hier ein Bus fährt."
+→ NIE erklären warum es absurd ist. Einfach so tun als wäre alles normal.
+Die absurde Prämisse kommt sofort. Konsequent durchhalten bis zum Ende.`
+  },
+  {
+    id:"tier", icon:"🐸", label:"Tier-Überraschung", desc:"Tier-Logik als Pointe",
+    prompt:`WITZMECHANISMUS – Tier mit wörtlicher Logik:
+Zwei Tiere reden miteinander. Eines denkt zu wörtlich oder zieht falsche aber konsequente Schlüsse.
+Beispiel-Prinzip: Frösche springen ins Wasser "sonst werden wir noch nass!"
+→ Das Tier meint es ERNST. Keine Ironie. Tier-Logik = Kind-Logik.
+Die verdrehte Schlussfolgerung ist die letzte Zeile.`
+  },
+  {
+    id:"dreimal", icon:"🔁", label:"Dreimal-Pointe", desc:"Muster aufbauen, dann brechen",
+    prompt:`WITZMECHANISMUS – Dreimal-Wiederholung mit Bruch:
+Etwas passiert zweimal exakt gleich (Muster aufbauen). Beim dritten Mal kommt eine völlig andere Wendung.
+Beispiel-Prinzip: Hase kommt dreimal, fragt nach Möhren. Beim 3. Mal hat der Laden Möhren – "Igitt! Ich mag keine Möhren!"
+→ Die ersten zwei Runden IDENTISCH formulieren, damit der Bruch im dritten Moment knallt.
+Geduld: Muster 1 → Muster 2 → ÜBERRASCHUNG.`
+  },
+  {
+    id:"schlagfertig", icon:"🙃", label:"Schlagfertig", desc:"Kind schlägt Erwachsenen",
+    prompt:`WITZMECHANISMUS – Schlagfertige Rollenumkehr:
+Erwachsener (Mutter/Lehrer/Vater) fragt oder kritisiert. Das Kind antwortet mit seiner eigenen Logik und hat am Ende eindeutig Recht.
+Beispiel-Prinzip: Lehrer: "Warum so schmutzig?" – Kind: "Ich bin halt näher am Boden als Sie!"
+→ Das Kind ist NICHT frech, sondern absolut logisch. Der Erwachsene hat keine Antwort mehr.
+Kurzer Schlagabtausch. Letzte Zeile gehört dem Kind.`
+  }
+];
+let activeHumorId = "keiner";
+
+/* ══════════════════════════════════════════
+   SOUND GROUPS
+══════════════════════════════════════════ */
+const GROUPS = [
+  { label:"Vokale",          sounds:["a","e","i","o","u"] },
+  { label:"Umlaute",         sounds:["ä","ö","ü"] },
+  { label:"Diphthonge",      sounds:["ei","ie","au","eu","äu","ai"] },
+  { label:"Konsonanten",     sounds:["b","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","z"] },
+  { label:"Lautverbindungen",sounds:["ch","sch","st","sp","ng","ck","tz","pf","nk","ss","qu"] }
+];
+const DEFAULT = new Set(["a","e","i","o","u","l","m","n","p","t","s","w","r","d","h","f","b","ei","ie","ch"]);
+let selected = new Set(DEFAULT);
+
+/* state */
+let loading = false;
+let currentRawText = "";   // plain text for re-render / synonym replacement
+let variantCount   = 1;    // 1 = aus; sonst Best-of-N bei der Erstgenerierung
+let storyVariants  = [];   // [{ text, errors, reason }] – nur bei Best-of-N gefüllt
+let activeVariant  = 0;
+let currentErrors  = [];
+let attemptCount   = 0;
+const MAX_ATTEMPTS = 5;
+
+/* ══════════════════════════════════════════
+   BUILD UI
+══════════════════════════════════════════ */
+function buildHumorGrid() {
+  const grid = document.getElementById("humor-grid");
+  for (const h of HUMOR_TYPES) {
+    const btn = document.createElement("button");
+    btn.className = "humor-btn" + (h.id === activeHumorId ? " active" : "");
+    btn.innerHTML = `<span class="hicon">${h.icon}</span><span class="hlabel">${h.label}</span><span class="hdesc">${h.desc}</span>`;
+    btn.addEventListener("click", () => {
+      activeHumorId = h.id;
+      document.querySelectorAll(".humor-btn").forEach(b => b.classList.remove("active"));
+      btn.classList.add("active");
+      updateHintCard();
+    });
+    grid.appendChild(btn);
+  }
+}
+
+function buildSoundCard() {
+  const card = document.getElementById("sound-card");
+  card.innerHTML = '<div class="card-title">Bekannte Laute</div>';
+  for (const g of GROUPS) {
+    const lbl = document.createElement("div");
+    lbl.className = "group-label"; lbl.textContent = g.label;
+    card.appendChild(lbl);
+    const row = document.createElement("div"); row.className = "chips";
+    for (const s of g.sounds) {
+      const btn = document.createElement("button");
+      btn.className = "chip" + (selected.has(s) ? " on" : "");
+      btn.textContent = s;
+      btn.addEventListener("click", () => {
+        if (selected.has(s)) { selected.delete(s); btn.classList.remove("on"); }
+        else { selected.add(s); btn.classList.add("on"); }
+        updateSelectedDisplay();
+      });
+      row.appendChild(btn);
+    }
+    card.appendChild(row);
+  }
+}
+
+function updateSelectedDisplay() {
+  const el = document.getElementById("selected-display");
+  const all = [...selected].sort();
+  el.textContent = all.length ? all.join("  ·  ") : "Keine Laute ausgewählt";
+}
+
+document.getElementById("wordlen").addEventListener("input", e => document.getElementById("wl-val").textContent = e.target.value);
+document.getElementById("textlen").addEventListener("input", e => document.getElementById("tl-val").textContent = e.target.value);
+document.getElementById("api-key").addEventListener("input", () => {
+  updateApiKeyState();
+  persistApiKey();
+});
+document.getElementById("btn-gen").addEventListener("click", () => {
+  attemptCount = 0; currentRawText = ""; currentErrors = [];
+  storyVariants = []; activeVariant = 0; renderVariantBar();
+  closeSynPopover();
+  generate();
+});
+
+/* ══════════════════════════════════════════
+   STATUS / PROGRESS
+══════════════════════════════════════════ */
+function setStatus(text, type) {
+  const el = document.getElementById("status-bar");
+  el.textContent = text;
+  el.className = "status-bar" + (text ? " visible " + type : "");
+}
+
+function updateProgress(attempt, total, state) {
+  const cp = document.getElementById("cp");
+  const fill = document.getElementById("cp-fill");
+  const label = document.getElementById("cp-text");
+  const count = document.getElementById("cp-count");
+  if (attempt === 0) { cp.classList.remove("visible"); return; }
+  cp.classList.add("visible");
+  const pct = Math.round((attempt / total) * 100);
+  fill.style.width = pct + "%";
+  fill.className = "cp-fill" + (state === "done" ? " done" : state === "failed" ? " failed" : "");
+  count.textContent = `${attempt}/${total}`;
+  if (state === "done")   label.textContent = "✓ Alle Laute korrekt!";
+  else if (state === "failed") label.textContent = "Restfehler – manuelle Nachbesserung möglich";
+  else label.textContent = `Korrektur läuft …`;
+}
+
+function setLoading(state) {
+  loading = state;
+  document.getElementById("btn-gen").disabled = state;
+  const r = document.getElementById("btn-retry");
+  if (r) r.disabled = state;
+}
+
+/* ══════════════════════════════════════════
+   VALIDATION
+══════════════════════════════════════════ */
+function getAllowedSounds() {
+  const singles = [...selected].filter(s => s.length===1 && !"aeiouäöü".includes(s));
+  return [...new Set([...selected, ...singles.map(c=>c+c)])].sort((a,b)=>b.length-a.length);
+}
+
+function isWordValid(word) {
+  const norm = word.toLowerCase().replace(/ß/g,"ss");
+  const allSounds = getAllowedSounds();
+  let pos = 0;
+  while (pos < norm.length) {
+    let matched = false;
+    for (const s of allSounds) {
+      if (norm.slice(pos).startsWith(s)) { pos += s.length; matched = true; break; }
+    }
+    if (!matched) return { ok: false, bad: norm[pos] };
+  }
+  return { ok: true };
+}
+
+function validateText(text) {
+  const norm = text.toLowerCase().replace(/ß/g,"ss").replace(/[^a-zäöü\s]/g," ");
+  const words = norm.split(/\s+/).filter(w => w.length > 0);
+  const allSounds = getAllowedSounds();
+  const errors = [];
+  for (const word of words) {
+    let pos = 0, bad = null;
+    while (pos < word.length) {
+      let matched = false;
+      for (const s of allSounds) {
+        if (word.slice(pos).startsWith(s)) { pos += s.length; matched = true; break; }
+      }
+      if (!matched) { bad = word[pos]; break; }
+    }
+    if (bad !== null && !errors.find(e => e.word === word)) errors.push({ word, bad });
+  }
+  return errors;
+}
+
+/* ══════════════════════════════════════════
+   MILDENBERGER SYLLABIFICATION
+══════════════════════════════════════════ */
+// ch/sch/ck bleiben zusammen (Be-cher, Fi-scher, Zu-cker), weil sie einen einzelnen Laut
+// darstellen. "ss"/"tz" und auch "ng" dagegen werden IMMER in der Mitte getrennt (Was-ser,
+// Kat-ze, Fin-ger, Sin-gen, Klin-gel) – sie gehören daher NICHT hierher, sondern folgen der
+// normalen Mehrfachkonsonanten-Regel.
+const DIGRAPHS      = ["sch","ch","ck","pf","qu","th","ph"];
+const DIPHTHONGS    = ["ei","ie","au","eu","äu","ai","oi"];
+// Doppelvokale wie "aa"/"ee"/"oo" (Boot, Meer, Aal) stehen für einen langen Einzellaut
+// und werden – genau wie Diphthonge – nie getrennt (Duden-Worttrennungsregeln).
+const DOUBLE_VOWELS = ["aa","ee","oo"];
+const VOWEL_UNITS   = [...DIPHTHONGS, ...DOUBLE_VOWELS];
+const VOWELS_SET = new Set(["a","e","i","o","u","ä","ö","ü"]);
+
+// Kompositum-Erstglieder, die auf einem bloßen Vokal enden (Fremd-/Lehnwortpräfixe).
+// Trifft das Zweitglied mit demselben Vokal zusammen (Mikro+Obst, Klima+Anlage), darf der
+// Vokal NICHT zum Doppelvokal verschmolzen werden – anders als bei "Boot" ist das keine
+// eine Silbe, sondern eine echte Wortfuge, die getrennt bleiben muss (Mik-ro-obst, Kli-ma-an-la-ge).
+const VOWEL_END_PREFIXES = [
+  "mikro","makro","foto","auto","kilo","bio","video","radio","kakao",
+  "kino","turbo","deko","solo","piano","klima","kamera","villa","pizza",
+  "sauna","firma","extra","gala","sofa","schema","drama","thema","yoga"
+];
+
+function findForcedHiatusIndex(lw) {
+  for (const p of VOWEL_END_PREFIXES) {
+    if (lw.startsWith(p) && lw[p.length] === p[p.length - 1]) return p.length - 1;
+  }
+  return -1;
+}
+
+// Häufige Grundschul-/Erstleser-Wörter, die als Kompositum-Teil auftreten (Puste+Blume,
+// Vogel+Haus …). Ohne Kompositum-Erkennung wendet der Algorithmus die normale
+// Konsonantenregel über die ganze Wortfuge hinweg an, was gültige Anlaute wie "bl" zerreißt
+// (Pus-teb-lu-me statt Pus-te-blu-me). Beide Wortteile müssen hier stehen, damit ein Treffer zählt.
+const COMPOUND_PARTS = new Set([
+  // Natur/Wetter
+  "sonne","mond","stern","wolke","regen","schnee","wind","sturm","blitz","donner","nebel","frost","wetter","eis",
+  // Landschaft
+  "wald","berg","tal","fluss","meer","see","insel","wiese","feld","garten","strand","hügel","erde","stein","sand","fels",
+  // Pflanzen
+  "blume","baum","blatt","wurzel","gras","strauch","busch",
+  // Obst/Gemüse/Essen
+  "apfel","birne","traube","kirsche","erdbeere","banane","orange","zitrone","kartoffel","tomate","gurke","karotte",
+  "obst","gemüse","brot","käse","wurst","kuchen","torte","suppe","milch","saft","zucker","salz","honig","ei","tee","kaffee",
+  // Tiere
+  "hund","katze","maus","vogel","fisch","pferd","kuh","schaf","huhn","ente","gans","biene","schmetterling",
+  "käfer","spinne","ameise","wurm","schnecke","frosch","fuchs","hase","reh","hirsch","wolf","bär","löwe",
+  "tiger","affe","elefant","giraffe","krokodil","schlange","delfin","wal","hai","otter","robbe","pinguin",
+  "eule","adler","storch","schwan","specht","amsel","spatz","rabe","taube","drache",
+  // Weitere Tiere: Wald, Bauernhof, Zoo, Insekten, Wasser
+  "eichhörnchen","dachs","igel","marder","ziege","esel","gockel","huhn","kaninchen",
+  "hummel","libelle","heuschrecke","wanze","krebs","qualle","welle","muschel","koralle",
+  "kranich","möwe","papagei","meise","zebra","nashorn","känguru","panda","gorilla","nilpferd",
+  // Körper
+  "kopf","haar","auge","ohr","nase","mund","zahn","hand","arm","bein","fuss","bauch","rücken","herz",
+  "zunge","lippe","wange","stirn","kinn","schulter","knie","zeh","finger","daumen","faust",
+  // Haus/Möbel
+  "haus","tür","fenster","tisch","stuhl","bett","schrank","lampe","spiegel","teppich","treppe","dach",
+  "küche","keller","boden","wand","decke","balkon","zaun","hecke","kamin","ofen","herd","sofa","kissen",
+  // Schule
+  "schule","tafel","kreide","heft","stift","buch","tasche","klasse","hof","pause","spiel","platz",
+  "pult","ranzen","lineal","radiergummi","schüler","schülerin","lehrer","lehrerin",
+  // Fahrzeuge
+  "auto","zug","bahn","schiff","boot","flugzeug","fahrrad","roller","rad","lenkrad","motor",
+  "reifen","sattel","lastwagen","traktor","kran","hubschrauber","rakete","ballon",
+  // Kleidung
+  "hut","schuh","hemd","hose","jacke","mantel","kleid","socke","mütze","handschuh",
+  "schal","gürtel","strumpf","pullover","stiefel",
+  // Zeit
+  "jahr","tag","nacht","morgen","abend","woche","monat","stunde","mittag","mitternacht",
+  "frühling","sommer","herbst","winter",
+  // Familie/Personen
+  "mama","papa","oma","opa","kind","junge","mädchen","mann","frau","freund","freundin",
+  "baby","onkel","tante","geschwister",
+  // Berufe
+  "arzt","polizist","feuerwehr","bauer","gärtner","pilot","kapitän",
+  // Orte/Gebäude
+  "stadt","dorf","strasse","weg","brücke","turm","schloss","burg","markt","laden","park",
+  "zoo","museum","kirche","rathaus","bahnhof","bauernhof","stall","scheune","gehege",
+  // Märchen/Fantasie
+  "ritter","könig","königin","zauberer","hexe","fee","zwerg","riese","prinz","prinzessin",
+  "drache","drachen","monster","gespenst",
+  // Spielzeug/Werkzeug
+  "ball","seil","eimer","puppe","teddybär","bauklotz","kreisel","hammer","säge","schraube",
+  "nagel","zange","leiter","schlüssel","korb","tüte","kiste","kasten",
+  // Musik/Sport
+  "lied","note","trommel","flöte","gitarre","klavier","geige","sprung","tor","netz",
+  // Essen/Feste
+  "reis","nudel","keks","bonbon","schokolade","marmelade","butter","geburtstag","geschenk",
+  "kerze","fest","weihnachten","ostern",
+  // Gefühle
+  "freude","angst","wut","liebe","mut",
+  // Natur (weitere)
+  "himmel","bogen","quelle","bach","teich","moor","gewitter","hagel","duft",
+  "tropfen","funke","flamme","rauch","asche","staub","stamm","ast","zweig","rinde","moos","farn",
+  "kern","korn","samen","knospe",
+  "brief","karte",
+  // Körperteile (Tiere), Alltagsgegenstände, weitere Zweitglieder
+  "schrei","klingel","schmerz","ring","kette","seite","ende","mitte","rand","ecke","spitze",
+  "schwanz","kralle","pfote","fell","feder","schnabel","huf","geweih","stachel","panzer","flosse","kieme","brust",
+  // Verb-Stämme als Kompositum-Erstglied (pusten -> Puste-, spielen -> Spiel- …)
+  "puste","spiel","schwimm","lauf","tanz","sing","mal","back","koch","les","schreib","rechn",
+  "turn","spring","flieg","fahr","trag","lach","wein","schlaf","wach","renn","kletter","hör","seh"
+]);
+const FUGENELEMENTE = ["", "s", "n", "es", "en"];
+
+// Ein Teil zählt als "bekannt", wenn er selbst im Wörterbuch steht ODER seinerseits aus
+// bekannten Teilen besteht (rekursiv) – nötig für Ketten-Komposita wie Fuss+Ball+Platz.
+function isKnownCompoundPart(lw) {
+  return COMPOUND_PARTS.has(lw) || findCompoundSplitIndex(lw) > 0;
+}
+
+function findCompoundSplitIndex(lw) {
+  for (let i = 3; i <= lw.length - 3; i++) {
+    if (!isKnownCompoundPart(lw.slice(i))) continue;
+    for (const f of FUGENELEMENTE) {
+      if (f && !lw.slice(0, i).endsWith(f)) continue;
+      const left = lw.slice(0, i - f.length);
+      if (left.length >= 2 && isKnownCompoundPart(left)) return i;
+    }
+  }
+  return -1;
+}
+
+function tokenize(word) {
+  const lw = word.toLowerCase(), tokens = [];
+  const hiatusIdx = findForcedHiatusIndex(lw);
+  let i = 0;
+  while (i < lw.length) {
+    let found = false;
+    if (i !== hiatusIdx) {
+      for (const d of VOWEL_UNITS) {
+        if (lw.slice(i).startsWith(d)) { tokens.push({ type:"V", val: word.slice(i, i+d.length) }); i += d.length; found = true; break; }
+      }
+    }
+    if (found) continue;
+    for (const d of DIGRAPHS) {
+      if (lw.slice(i).startsWith(d)) { tokens.push({ type:"C", val: word.slice(i, i+d.length) }); i += d.length; found = true; break; }
+    }
+    if (found) continue;
+    tokens.push({ type: VOWELS_SET.has(lw[i]) ? "V" : "C", val: word[i] });
+    i++;
+  }
+  return tokens;
+}
+
+function syllabify(word) {
+  if (!word) return [""];
+  const splitIdx = findCompoundSplitIndex(word.toLowerCase());
+  if (splitIdx > 0) {
+    return [...syllabify(word.slice(0, splitIdx)), ...syllabify(word.slice(splitIdx))];
+  }
+  const tokens = tokenize(word);
+  if (tokens.filter(t=>t.type==="V").length <= 1) return [word];
+  const syllables = []; let cur = "";
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i]; cur += t.val;
+    if (t.type === "V") {
+      const cons = []; let j = i+1;
+      while (j < tokens.length && tokens[j].type==="C") { cons.push(tokens[j]); j++; }
+      if (j < tokens.length) {
+        if (cons.length === 0) { syllables.push(cur); cur = ""; }
+        else if (cons.length === 1) { syllables.push(cur); cur = ""; }
+        else { for (let k=0; k<cons.length-1; k++) { cur += cons[k].val; i++; } syllables.push(cur); cur = ""; }
+      }
+    }
+  }
+  if (cur) syllables.push(cur);
+  return syllables.filter(s=>s.length>0);
+}
+
+/* ══════════════════════════════════════════
+   RENDER STORY
+══════════════════════════════════════════ */
+function renderMildenberger(rawText, errorsToHighlight) {
+  const errors = errorsToHighlight || [];
+  const badWords = new Set(errors.map(e => e.word.toLowerCase()));
+  const badMap   = Object.fromEntries(errors.map(e => [e.word.toLowerCase(), e.bad]));
+
+  const humorType = HUMOR_TYPES.find(h=>h.id===activeHumorId);
+  const wrap = document.getElementById("story-wrap");
+  wrap.className = "story-wrap"; wrap.innerHTML = "";
+
+  if (humorType && humorType.prompt) {
+    const tag = document.createElement("div");
+    tag.className = "humor-tag";
+    tag.textContent = humorType.icon + " " + humorType.label;
+    wrap.appendChild(tag);
+  }
+
+  const textDiv = document.createElement("div");
+  textDiv.className = "story-text";
+
+  const lines = rawText.split(/\n+/).filter(l=>l.trim());
+  lines.forEach((line, li) => {
+    // Jede Zeile bekommt einen eigenen Container – der Abstand kommt aus dem CSS
+    // (.story-line), nicht mehr aus doppelten <br>.
+    const lineDiv = document.createElement("div");
+    lineDiv.className = "story-line";
+    textDiv.appendChild(lineDiv);
+    const parts = line.match(/[a-zA-ZäöüÄÖÜß]+|[^a-zA-ZäöüÄÖÜß]+/g) || [];
+    for (const part of parts) {
+      if (/[a-zA-ZäöüÄÖÜß]/.test(part)) {
+        const isErr = badWords.has(part.toLowerCase());
+        if (isErr) {
+          const badLaut = badMap[part.toLowerCase()];
+          const span = document.createElement("span");
+          span.className = "bad-word";
+          span.dataset.word = part;
+          span.dataset.bad  = badLaut;
+          span.title = `Laut „${badLaut}" nicht eingeführt – klicken zum Bearbeiten`;
+          span.textContent = part;
+          const sup = document.createElement("span");
+          sup.className = "bad-laut"; sup.textContent = badLaut;
+          span.appendChild(sup);
+          span.addEventListener("click", (e) => { e.stopPropagation(); startInlineEdit(span, part); });
+          lineDiv.appendChild(span);
+        } else {
+          const wordSpan = document.createElement("span");
+          wordSpan.className = "editable-word";
+          wordSpan.dataset.word = part;
+          wordSpan.title = "Klicken zum Bearbeiten";
+          const syls = syllabify(part);
+          syls.forEach((syl, si) => {
+            const sp = document.createElement("span");
+            sp.className = si%2===0 ? "syl-a" : "syl-b";
+            sp.textContent = syl; wordSpan.appendChild(sp);
+          });
+          wordSpan.addEventListener("click", (e) => { e.stopPropagation(); startInlineEdit(wordSpan, part); });
+          lineDiv.appendChild(wordSpan);
+        }
+      } else {
+        const sp = document.createElement("span"); sp.className = "punct"; sp.textContent = part;
+        lineDiv.appendChild(sp);
+      }
+    }
+  });
+
+  wrap.appendChild(textDiv);
+
+  const legend = document.createElement("div");
+  legend.className = "syl-legend";
+  legend.innerHTML = `<span>Silbenfärbung nach Mildenberger:</span>
+    <span class="syl-legend-item"><span class="syl-dot" style="background:#1a5cb5"></span>1. Silbe</span>
+    <span class="syl-legend-item"><span class="syl-dot" style="background:#c05a00"></span>2. Silbe</span>
+    ${errors.length > 0 ? '<span class="syl-legend-item"><span class="syl-dot" style="background:#d44"></span>Nicht eingeführter Laut</span>' : ''}
+    <span class="syl-legend-item" style="color:#2d9a65">✎ Jedes Wort anklicken zum Bearbeiten</span>`;
+  wrap.appendChild(legend);
+  document.getElementById("export-bar").classList.add("visible");
+}
+
+/* ══════════════════════════════════════════
+   INLINE WORD EDITING
+   Click any word → input field with live validation
+══════════════════════════════════════════ */
+let activeInlineEdit = null;
+
+function startInlineEdit(span, originalWord) {
+  // Close any existing edit
+  if (activeInlineEdit) cancelInlineEdit(activeInlineEdit);
+  closeSynPopover();
+
+  const wrap = document.createElement("span");
+  wrap.className = "inline-edit-wrap";
+
+  const input = document.createElement("input");
+  input.type = "text";
+  input.className = "inline-edit-input";
+  input.value = originalWord;
+  input.style.width = Math.max(60, originalWord.length * 18 + 20) + "px";
+
+  const hint = document.createElement("span");
+  hint.className = "inline-edit-hint neutral";
+  hint.textContent = "Enter ↵ bestätigen · Esc abbrechen";
+
+  wrap.appendChild(input);
+  wrap.appendChild(hint);
+
+  // Store reference for cleanup
+  const editState = { wrap, input, hint, span, originalWord };
+  activeInlineEdit = editState;
+
+  // Replace the word span
+  span.parentNode.insertBefore(wrap, span);
+  span.style.display = "none";
+
+  input.focus();
+  input.select();
+
+  // Live validation while typing
+  input.addEventListener("input", () => {
+    const w = input.value.trim();
+    input.style.width = Math.max(60, w.length * 18 + 20) + "px";
+    if (!w) {
+      hint.textContent = "Wort eingeben…";
+      hint.className = "inline-edit-hint neutral";
+      input.className = "inline-edit-input";
+      return;
+    }
+    const maxLen = parseInt(document.getElementById("wordlen").value);
+    const v = isWordValid(w);
+    const problems = [];
+    if (!v.ok) problems.push(`Laut „${v.bad}" nicht erlaubt`);
+    // Überlänge blockiert eine manuelle Korrektur nicht – nur als Hinweis anzeigen
+    const overLen = w.length > maxLen;
+
+    if (problems.length === 0) {
+      hint.textContent = overLen
+        ? `✓ OK – Enter ↵ (${w.length} Buchst., über dem Limit von ${maxLen})`
+        : "✓ OK – Enter ↵ zum Bestätigen";
+      hint.className = "inline-edit-hint valid";
+      input.className = "inline-edit-input";
+    } else {
+      hint.textContent = "✗ " + problems.join(" · ");
+      hint.className = "inline-edit-hint invalid";
+      input.className = "inline-edit-input edit-invalid";
+    }
+  });
+
+  // Confirm on Enter
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirmInlineEdit(editState);
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      cancelInlineEdit(editState);
+    }
+  });
+
+  // Confirm on blur (clicking away)
+  input.addEventListener("blur", () => {
+    setTimeout(() => {
+      if (activeInlineEdit === editState) {
+        const w = input.value.trim();
+        if (w && w !== originalWord) {
+          confirmInlineEdit(editState);
+        } else {
+          cancelInlineEdit(editState);
+        }
+      }
+    }, 150);
+  });
+}
+
+function confirmInlineEdit(editState) {
+  const { wrap, input, span, originalWord } = editState;
+  const newWord = input.value.trim();
+  if (!newWord) { cancelInlineEdit(editState); return; }
+
+  // Validate
+  // Manuelle Korrektur wird immer übernommen – Lautfehler zeigt das Re-Render an,
+  // eine Überschreitung der Wortlänge ist hier ausdrücklich erlaubt.
+  // Replace in raw text (case-aware)
+  const regex = new RegExp(originalWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi");
+  currentRawText = currentRawText.replace(regex, m => {
+    if (m[0] === m[0].toUpperCase()) return newWord.charAt(0).toUpperCase() + newWord.slice(1);
+    return newWord;
+  });
+
+  // Clean up inline edit
+  if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+  span.style.display = "";
+  activeInlineEdit = null;
+
+  // Re-validate and re-render
+  const errors = validateText(currentRawText);
+  currentErrors = errors;
+  renderMildenberger(currentRawText, errors);
+  showValidation(errors);
+  syncActiveVariant();
+  if (errors.length === 0) {
+    setStatus("✓ Alle Laute korrekt nach manueller Anpassung!", "ok");
+    updateProgress(MAX_ATTEMPTS, MAX_ATTEMPTS, "done");
+  }
+}
+
+function cancelInlineEdit(editState) {
+  const { wrap, span } = editState;
+  if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
+  span.style.display = "";
+  if (activeInlineEdit === editState) activeInlineEdit = null;
+}
+
+/* ══════════════════════════════════════════
+   SYNONYM POPOVER
+══════════════════════════════════════════ */
+let synActiveSpan = null;
+let synCurrentWord = "";  // track word being replaced in popover
+
+function openSynPopover(span, word, badLaut) {
+  synActiveSpan = span;
+  synCurrentWord = word;
+  const pop = document.getElementById("syn-popover");
+  document.getElementById("syn-word").textContent = word;
+  document.getElementById("syn-reason").textContent = `Enthält nicht eingeführten Laut: „${badLaut}"`;
+  document.getElementById("syn-body").innerHTML = '<div class="syn-loading">🔍 Suche Alternativen…</div>';
+  // Reset manual input
+  const inp = document.getElementById("syn-manual-input");
+  inp.value = "";
+  inp.className = "syn-manual-input";
+  document.getElementById("syn-manual-btn").disabled = true;
+  document.getElementById("syn-manual-feedback").textContent = "";
+  document.getElementById("syn-manual-feedback").className = "syn-manual-feedback";
+  pop.classList.add("open");
+  positionPopover(span, pop);
+  fetchSynonyms(word, badLaut);
+}
+
+function positionPopover(anchor, pop) {
+  const rect = anchor.getBoundingClientRect();
+  const pw = 320, ph = 320;
+  let top  = rect.bottom + 8;
+  let left = rect.left;
+  if (left + pw > window.innerWidth - 8)  left = window.innerWidth - pw - 8;
+  if (top  + ph > window.innerHeight - 8) top  = rect.top - ph - 8;
+  pop.style.top  = top + "px";
+  pop.style.left = left + "px";
+}
+
+function closeSynPopover() {
+  document.getElementById("syn-popover").classList.remove("open");
+  synActiveSpan = null;
+}
+
+document.getElementById("syn-close").addEventListener("click", closeSynPopover);
+document.addEventListener("click", e => {
+  if (!document.getElementById("syn-popover").contains(e.target)) closeSynPopover();
+});
+
+/* ── Manual word input in synonym popover ── */
+document.getElementById("syn-manual-input").addEventListener("input", function() {
+  const w = this.value.trim();
+  const btn = document.getElementById("syn-manual-btn");
+  const fb = document.getElementById("syn-manual-feedback");
+  if (!w) {
+    btn.disabled = true;
+    fb.textContent = "";
+    fb.className = "syn-manual-feedback";
+    this.className = "syn-manual-input";
+    return;
+  }
+  const maxLen = parseInt(document.getElementById("wordlen").value);
+  const v = isWordValid(w);
+  const problems = [];
+  if (!v.ok) problems.push(`Enthält nicht erlaubten Laut „${v.bad}"`);
+  // Überlänge blockiert eine manuelle Korrektur nicht – nur als Hinweis anzeigen
+  const overLen = w.length > maxLen;
+
+  if (problems.length === 0) {
+    btn.disabled = false;
+    fb.textContent = overLen
+      ? `✓ Laute ok – ${w.length} Buchst., über dem Limit von ${maxLen}`
+      : "✓ Wort entspricht den Kriterien";
+    fb.className = "syn-manual-feedback valid";
+    this.className = "syn-manual-input";
+  } else {
+    btn.disabled = true;
+    fb.textContent = "✗ " + problems.join(" · ");
+    fb.className = "syn-manual-feedback invalid";
+    this.className = "syn-manual-input input-invalid";
+  }
+});
+
+document.getElementById("syn-manual-input").addEventListener("keydown", function(e) {
+  if (e.key === "Enter" && !document.getElementById("syn-manual-btn").disabled) {
+    document.getElementById("syn-manual-btn").click();
+  }
+});
+
+document.getElementById("syn-manual-btn").addEventListener("click", function() {
+  const w = document.getElementById("syn-manual-input").value.trim();
+  if (!w || !synCurrentWord) return;
+  replaceBadWord(synCurrentWord, w);
+});
+
+async function fetchSynonyms(word, badLaut) {
+  const apiKey = document.getElementById("api-key").value.trim();
+  const soundList = [...selected].sort().join(", ");
+  const maxLen = document.getElementById("wordlen").value;
+
+  const prompt = `Aufgabe: Finde 5 deutsche Synonyme oder bedeutungsähnliche Wörter für das Wort "${word}".
+
+STRENGE BEDINGUNGEN für jedes Vorschlagswort:
+- Darf NUR Laute aus dieser Liste enthalten: ${soundList}
+- Großbuchstaben der erlaubten Laute sind ok
+- Doppelte Konsonanten (nn, tt, mm usw.) sind ok falls der Einzellaut erlaubt ist
+- Maximal ${maxLen} Buchstaben lang
+- Muss kindgerecht und einfach sein (Klasse 1–2)
+- Muss inhaltlich sinnvoll als Ersatz für "${word}" nutzbar sein
+
+Antworte NUR mit einem JSON-Array mit genau 5 Strings, keine Erklärung:
+["Wort1","Wort2","Wort3","Wort4","Wort5"]`;
+
+  try {
+    const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: { "Content-Type":"application/json","Authorization":`Bearer ${apiKey}` },
+      body: JSON.stringify({ model:"gpt-4o-mini", max_tokens:120,
+        messages:[{role:"user",content:prompt}],
+        response_format:{type:"json_object"} })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error.message);
+
+    let raw = data.choices[0].message.content.trim();
+    // parse the JSON – model may wrap in object
+    let arr;
+    try {
+      const parsed = JSON.parse(raw);
+      arr = Array.isArray(parsed) ? parsed : (parsed.words || parsed.synonyms || Object.values(parsed)[0]);
+    } catch { arr = []; }
+
+    renderSynOptions(arr, word);
+  } catch(err) {
+    const box = document.getElementById("syn-body");
+    box.innerHTML = "";
+    const msg = document.createElement("div");
+    msg.className = "syn-empty";
+    msg.textContent = "Fehler: " + err.message;     // API-Antwort: als Text, nie als HTML
+    box.appendChild(msg);
+  }
+}
+
+function renderSynOptions(words, originalWord) {
+  const body = document.getElementById("syn-body");
+  if (!words || words.length === 0) {
+    body.innerHTML = '<div class="syn-empty">Keine Vorschläge gefunden.</div>'; return;
+  }
+  const list = document.createElement("div"); list.className = "syn-list";
+  for (const w of words) {
+    const v = isWordValid(w);
+    const opt = document.createElement("div");
+    opt.className = "syn-option" + (v.ok ? "" : " invalid");
+    const wordSpan = document.createElement("span");
+    wordSpan.textContent = w;                       // Modellantwort: als Text, nie als HTML
+    const badge = document.createElement("span");
+    badge.className = "syn-badge";
+    badge.textContent = v.ok ? "✓ OK" : "✗ " + v.bad;
+    opt.append(wordSpan, badge);
+    if (v.ok) {
+      opt.addEventListener("click", () => replaceBadWord(originalWord, w));
+    }
+    list.appendChild(opt);
+  }
+  body.innerHTML = ""; body.appendChild(list);
+}
+
+function replaceBadWord(original, replacement) {
+  // Case-aware replacement in raw text
+  const regex = new RegExp(original, "gi");
+  currentRawText = currentRawText.replace(regex, m => {
+    if (m[0] === m[0].toUpperCase()) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
+    return replacement;
+  });
+  closeSynPopover();
+  // Re-validate and re-render
+  const errors = validateText(currentRawText);
+  currentErrors = errors;
+  renderMildenberger(currentRawText, errors);
+  showValidation(errors);
+  syncActiveVariant();
+  if (errors.length === 0) {
+    setStatus("✓ Alle Laute korrekt nach manueller Anpassung!", "ok");
+    updateProgress(MAX_ATTEMPTS, MAX_ATTEMPTS, "done");
+  }
+}
+
+/* ══════════════════════════════════════════
+   VALIDATION UI
+══════════════════════════════════════════ */
+function showValidation(errors) {
+  const el = document.getElementById("validation-out");
+  if (errors.length === 0) {
+    el.innerHTML = '<div class="validation-box ok">✓ Alle Laute geprüft – Text ist sauber!</div>';
+  } else {
+    const items = errors.map(e => `<li>„${e.word}" — Laut: <strong>${e.bad}</strong></li>`).join("");
+    const retryBtn = attemptCount < MAX_ATTEMPTS
+      ? `<button class="btn-retry" id="btn-retry">↺ KI-Korrektur (Versuch ${attemptCount+1}/${MAX_ATTEMPTS})</button>`
+      : `<button class="btn-retry" id="btn-retry" disabled>Max. Versuche erreicht – bitte manuell per Synonymwerkzeug korrigieren</button>`;
+    const restartBtn = attemptCount >= MAX_ATTEMPTS
+      ? `<button class="btn-restart" id="btn-restart">🔄 Neue Korrekturrunde starten</button>`
+      : '';
+    el.innerHTML = `<div class="validation-box fail">
+      <div class="v-title">⚠ ${errors.length} Wort${errors.length>1?"e":""} mit nicht eingeführten Lauten</div>
+      <div class="v-hint">Rot markierte Wörter im Text anklicken → direkt neues Wort eintippen</div>
+      <ul class="err-list">${items}</ul>
+      ${retryBtn}${restartBtn}
+    </div>`;
+    const rb = document.getElementById("btn-retry");
+    if (rb && !rb.disabled) rb.addEventListener("click", () => generate(currentRawText, currentErrors));
+    const rs = document.getElementById("btn-restart");
+    if (rs) rs.addEventListener("click", () => {
+      attemptCount = 0;
+      updateProgress(0, MAX_ATTEMPTS, "");
+      setStatus("Neue Korrekturrunde gestartet …", "info");
+      generate(currentRawText, currentErrors);
+    });
+  }
+}
+
+/* ══════════════════════════════════════════
+   SMART CORRECTION PROMPT
+   Instead of full rewrite, send only the bad words
+   and ask to substitute them in place — much cheaper.
+══════════════════════════════════════════ */
+function buildCorrectionPrompt(prevText, errors, wordLen, soundList) {
+  const errDetails = errors.map(e =>
+    `  • "${e.word}" → enthält verbotenen Laut "${e.bad}". Ersetze nur dieses Wort durch ein bedeutungsähnliches Wort das ausschließlich aus erlaubten Lauten besteht.`
+  ).join("\n");
+
+  return `Du bist Grundschullehre:in. Korrigiere den folgenden Lesetext.
+
+ERLAUBTE LAUTE: ${soundList}
+(Großbuchstaben ok. Doppelte Konsonanten erlaubt wenn Einzellaut erlaubt.)
+Kein Wort länger als ${wordLen} Buchstaben.
+
+NUR DIESE WÖRTER ERSETZEN – alles andere UNVERÄNDERT lassen:
+${errDetails}
+
+WICHTIG:
+- Gib NUR den korrigierten Text zurück, keine Erklärung.
+- Verändere Satzbau, Witzmechanismus und alle anderen Wörter NICHT.
+- Wenn kein geeignetes Ersatzwort existiert, lasse das Wort weg oder forme den Satz minimal um.
+
+Originaltext:
+${prevText}`;
+}
+
+// GPT schreibt gelegentlich einzelne Wörter mit Bindestrich (z.B. "ab-ge-ho-ben"), meist als
+// Workaround für die Wortlängen-Vorgabe. Für Erstleser ist das nur verwirrend – die Silbenfarben
+// übernehmen diese Aufgabe bereits. Bindestriche zwischen zwei Buchstaben werden daher entfernt,
+// das Wort wandert wieder zusammen (und wird ggf. regulär als zu lang erkannt und korrigiert).
+function stripStrayHyphens(text) {
+  return text.replace(/([a-zA-ZäöüÄÖÜß])-(?=[a-zA-ZäöüÄÖÜß])/g, "$1");
+}
+
+/* ══════════════════════════════════════════
+   OPENAI-AUFRUF (eine Stelle für alle Calls)
+══════════════════════════════════════════ */
+async function callOpenAI(apiKey, opts) {
+  const resp = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type":"application/json", "Authorization":`Bearer ${apiKey}` },
+    body: JSON.stringify(Object.assign({ model:"gpt-4o", max_tokens:600, temperature:0.8 }, opts))
+  });
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error.message);
+  return data.choices[0].message.content.trim();
+}
+
+/* ══════════════════════════════════════════
+   BEST-OF-N: mehrere Texte erzeugen, den besten wählen
+══════════════════════════════════════════ */
+
+/* Die KI bewertet die Kandidaten. Fällt sie aus, gewinnt der erste
+   Kandidat – die Auswahl darf die Generierung nie blockieren. */
+async function judgeVariants(apiKey, candidates) {
+  const texts = candidates
+    .map((c, i) => `TEXT ${i+1}:\n${c.text}`)
+    .join("\n\n---\n\n");
+
+  const prompt = `Du bist erfahrene Grundschullehre:in und beurteilst Kindergeschichten.
+Unten stehen ${candidates.length} Texte zum selben Auftrag. Wähle den erzählerisch besten aus.
+
+BEWERTE NUR NACH:
+1. Originalität: überraschende Idee, kein Klischee, keine Standardhandlung. Ein Text, den man so nicht schon hundertmal gelesen hat, gewinnt.
+2. Erzählqualität: Trägt der Bogen? Gibt es eine echte Wendung oder Pointe, die sitzt? Haben die Figuren Eigenleben?
+3. Lebendigkeit: klingt erzählt statt konstruiert, Dialoge mit Witz, konkrete Bilder statt Floskeln.
+
+BEWERTE AUSDRÜCKLICH NICHT:
+- Rechtschreibung, verwendete Laute, Wort- oder Textlänge. Das wird anschließend automatisch korrigiert und darf die Auswahl nicht beeinflussen.
+- Bravheit oder Vollständigkeit. Ein kurzer starker Text schlägt einen langen braven.
+
+Bei Gleichstand gewinnt der originellere Text.
+
+${texts}
+
+Antworte NUR mit JSON: {"beste": <Nummer von 1 bis ${candidates.length}>, "grund": "<höchstens 10 Wörter>"}`;
+
+  try {
+    const raw = await callOpenAI(apiKey, {
+      model: "gpt-4o", max_tokens: 120, temperature: 0,
+      messages: [{ role:"user", content: prompt }],
+      response_format: { type:"json_object" }
+    });
+    const parsed = JSON.parse(raw);
+    const idx = parseInt(parsed.beste, 10) - 1;
+    if (!Number.isInteger(idx) || idx < 0 || idx >= candidates.length) return { index: 0 };
+    return { index: idx, reason: typeof parsed.grund === "string" ? parsed.grund : "" };
+  } catch {
+    return { index: 0 };
+  }
+}
+
+/* Erzeugt N Texte parallel und lässt die KI den erzählerisch besten wählen. */
+async function generateVariants(apiKey, prompt, n) {
+  setStatus(`Erzeuge ${n} Varianten …`, "info");
+
+  const results = await Promise.allSettled(
+    Array.from({ length: n }, () => callOpenAI(apiKey, {
+      model: "gpt-4o", max_tokens: 600, temperature: 0.9,
+      messages: [{ role:"user", content: prompt }]
+    }))
+  );
+
+  const candidates = results
+    .filter(r => r.status === "fulfilled")
+    .map(r => {
+      const text = stripStrayHyphens(r.value);
+      return { text, errors: validateText(text), reason: "" };
+    });
+
+  if (candidates.length === 0) {
+    const first = results.find(r => r.status === "rejected");
+    throw new Error(first ? first.reason.message : "Keine Variante erhalten.");
+  }
+  if (candidates.length === 1) return { candidates, winner: 0 };
+
+  /* Bewertet wird allein die Geschichte – Güte und Originalität.
+     Lautfehler bleiben hier bewusst außen vor, die räumt die
+     anschließende Korrekturschleife auf dem Gewinner weg. */
+  setStatus(`Bewerte ${candidates.length} Texte nach Güte und Originalität …`, "info");
+  const verdict = await judgeVariants(apiKey, candidates);
+  candidates[verdict.index].reason = verdict.reason || "";
+  return { candidates, winner: verdict.index };
+}
+
+/* ══════════════════════════════════════════
+   VARIANTEN-LEISTE
+══════════════════════════════════════════ */
+function renderVariantBar() {
+  const bar = document.getElementById("variant-bar");
+  bar.innerHTML = "";
+  if (storyVariants.length < 2) { bar.classList.remove("visible"); return; }
+
+  const label = document.createElement("span");
+  label.className = "vb-label";
+  label.textContent = "Varianten";
+  bar.appendChild(label);
+
+  storyVariants.forEach((v, i) => {
+    const btn = document.createElement("button");
+    btn.className = "vb-btn" + (i === activeVariant ? " active" : "");
+    const flag = v.errors.length === 0 ? "✓" : `${v.errors.length}✗`;
+    btn.innerHTML = `${i+1}<span class="vb-flag">${flag}</span>`;
+    btn.title = v.errors.length === 0
+      ? "Alle Laute korrekt"
+      : `${v.errors.length} Wort${v.errors.length>1?"e":""} mit nicht eingeführten Lauten`;
+    btn.addEventListener("click", () => setActiveVariant(i));
+    bar.appendChild(btn);
+  });
+
+  const reason = storyVariants[activeVariant].reason;
+  if (reason) {
+    const r = document.createElement("span");
+    r.className = "vb-reason";
+    r.textContent = `KI-Auswahl: ${reason}`;
+    bar.appendChild(r);
+  }
+  bar.classList.add("visible");
+}
+
+function setActiveVariant(i) {
+  if (i === activeVariant || !storyVariants[i]) return;
+  closeSynPopover();
+  activeVariant  = i;
+  currentRawText = storyVariants[i].text;
+  const errors = validateText(currentRawText);
+  storyVariants[i].errors = errors;
+  currentErrors = errors;
+  renderMildenberger(currentRawText, errors);
+  showValidation(errors);
+  renderVariantBar();
+  setStatus(`Variante ${i+1} von ${storyVariants.length} übernommen.`, "info");
+}
+
+/* Hält die aktive Variante mit Korrekturen und manuellen Änderungen in Sync,
+   damit ein Umschalten keine Bearbeitung verschluckt. */
+function syncActiveVariant() {
+  if (storyVariants.length && storyVariants[activeVariant]) {
+    storyVariants[activeVariant].text   = currentRawText;
+    storyVariants[activeVariant].errors = currentErrors;
+    renderVariantBar();
+  }
+}
+
+/* ══════════════════════════════════════════
+   GENERATE
+══════════════════════════════════════════ */
+async function generate(prevText = null, prevErrors = null) {
+  if (selected.size === 0) { setStatus("Bitte mindestens einen Laut auswählen.", "warn"); return; }
+  const apiKey = document.getElementById("api-key").value.trim();
+  if (!apiKey) { setStatus("Bitte OpenAI API-Key eingeben.", "warn"); return; }
+
+  const humorType   = HUMOR_TYPES.find(h=>h.id===activeHumorId);
+  const wordLen     = document.getElementById("wordlen").value;
+  const textLen     = document.getElementById("textlen").value;
+  const soundList   = [...selected].sort().join(", ");
+  const customTopic = document.getElementById("custom-topic").value.trim();
+  const useSchema   = document.getElementById("story-schema").checked;
+
+  setLoading(true);
+  attemptCount++;
+  document.getElementById("validation-out").innerHTML = "";
+  updateProgress(attemptCount, MAX_ATTEMPTS, "running");
+
+  /* ── Build prompt ── */
+  let prompt, model;
+
+  if (prevText && prevErrors) {
+    /* CORRECTION: targeted word-substitution — cheaper model */
+    prompt = buildCorrectionPrompt(prevText, prevErrors, wordLen, soundList);
+    model  = "gpt-4o";  // still 4o for quality, but prompt is much shorter
+    setStatus(`Gezielte Korrektur (${prevErrors.length} Wort${prevErrors.length>1?"e":""}) – Versuch ${attemptCount}/${MAX_ATTEMPTS} …`, "warn");
+  } else {
+    /* FIRST GENERATION */
+    model = "gpt-4o";
+    const toneIntro = humorType.prompt
+      ? "Du bist Grundschullehre:in und Witzeprofi. Schreibe einen deutschen Lesetext für Erstleser (Klasse 1), der wirklich lustig ist."
+      : "Du bist Grundschullehre:in. Schreibe eine altersgerechte, spannende kleine Geschichte als deutschen Lesetext für Erstleser (Klasse 1).";
+    prompt = `${toneIntro}
+
+ERLAUBTE LAUTE (vollständige Liste): ${soundList}
+Verbotene Beispiele: ${getExampleForbidden()}
+Großbuchstaben der erlaubten Laute sind ok (Nomen). Doppelte Konsonanten (nn, mm, tt) erlaubt wenn der Einzellaut erlaubt ist.
+Kein Wort länger als ${wordLen} Buchstaben. Text ca. ${textLen} Wörter. Kurze Sätze, viel Dialog.
+Schreibe JEDES Wort normal am Stück, NIEMALS mit Bindestrich getrennt (also "abgehoben", nicht "ab-ge-ho-ben").
+
+${humorType.prompt ? `\n${humorType.prompt}\n` : ""}
+${customTopic ? `\nTHEMA: Baue die Geschichte um folgendes Thema bzw. folgende Wörter herum: ${customTopic}. Das Thema hat Vorrang vor generischen Inhalten, muss aber weiterhin zu den erlaubten Lauten passen.` : ""}
+${useSchema ? `\nZUSÄTZLICHES GERÜST${humorType.prompt ? " (neben dem Witzmechanismus einhalten)" : ""}:
+1. WUNSCH/PROBLEM: Die Hauptfigur will etwas oder hat gleich zu Anfang ein Problem.
+2. HINDERNIS: Ein Versuch klappt nicht, oder es gibt ein Hindernis.
+3. LÖSUNG/POINTE: Die Auflösung am Ende ist zugleich die Pointe${humorType.prompt ? " des Witzmechanismus" : ""}.` : ""}
+
+AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
+    prompt = prompt.replace(/\n{3,}/g, "\n\n");   // Leerzeilen aus leeren Bausteinen entfernen
+    const genLabel = humorType.prompt ? `„${humorType.label}"-Text` : "Text";
+    setStatus(customTopic
+      ? `Generiere ${genLabel} zum Thema „${customTopic}" …`
+      : `Generiere ${genLabel} …`, "info");
+  }
+
+  const isFirstGeneration = !(prevText && prevErrors);
+
+  try {
+    let text;
+
+    if (isFirstGeneration && variantCount > 1) {
+      const { candidates, winner } = await generateVariants(apiKey, prompt, variantCount);
+      storyVariants = candidates;
+      activeVariant = winner;
+      text = candidates[winner].text;
+    } else {
+      text = stripStrayHyphens(await callOpenAI(apiKey, {
+        model, max_tokens: 600, temperature: 0.8,
+        messages: [{ role:"user", content: prompt }]
+      }));
+    }
+    currentRawText = text;
+
+    const errors = validateText(text);
+    currentErrors = errors;
+    renderMildenberger(text, errors);
+    showValidation(errors);
+    syncActiveVariant();
+
+    if (errors.length === 0) {
+      setStatus(storyVariants.length > 1
+        ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert!`
+        : "✓ Text generiert und validiert!", "ok");
+      updateProgress(attemptCount, MAX_ATTEMPTS, "done");
+    } else if (attemptCount < MAX_ATTEMPTS) {
+      setStatus(`⚠ ${errors.length} Fehler – starte gezielte Korrektur …`, "warn");
+      setTimeout(() => generate(text, errors), 700);
+      return;
+    } else {
+      setStatus(`${errors.length} Fehler nach ${MAX_ATTEMPTS} Versuchen. Bitte manuell per Synonymwerkzeug korrigieren.`, "err");
+      updateProgress(attemptCount, MAX_ATTEMPTS, "failed");
+    }
+  } catch(err) {
+    setStatus("Fehler: " + err.message, "err");
+    updateProgress(attemptCount, MAX_ATTEMPTS, "failed");
+  } finally {
+    setLoading(false);
+  }
+}
+
+function getExampleForbidden() {
+  const all = ["sch","g","k","z","ö","ü","au","eu","ng","ck","j","v","x","y","qu","sp","st"];
+  return all.filter(s => !selected.has(s)).slice(0,6).join(", ") || "–";
+}
+
+/* ══════════════════════════════════════════
+   PRINT & PDF EXPORT
+══════════════════════════════════════════ */
+function printStory() {
+  if (!currentRawText) return;
+  window.print();
+}
+
+function exportPDF() {
+  if (!currentRawText) return;
+  const btn = document.getElementById("btn-pdf");
+  btn.textContent = "⏳ Erstelle PDF…";
+  btn.disabled = true;
+
+  // Clone story-wrap for clean PDF output
+  const source = document.getElementById("story-wrap");
+  const clone = source.cloneNode(true);
+
+  // Remove legend and humor tag from clone for cleaner PDF
+  const legend = clone.querySelector(".syl-legend");
+  if (legend) legend.remove();
+
+  // Remove bad-word superscript markers
+  clone.querySelectorAll(".bad-laut").forEach(el => el.remove());
+  // Remove bad-word styling
+  clone.querySelectorAll(".bad-word").forEach(el => {
+    el.style.background = "none";
+    el.style.borderBottom = "none";
+    el.style.cursor = "default";
+  });
+
+  // Create a wrapper for proper PDF styling
+  const wrapper = document.createElement("div");
+  wrapper.style.cssText = "padding: 12mm 10mm; font-family: 'Nunito', sans-serif; background: #fff;";
+  wrapper.appendChild(clone);
+  clone.style.cssText = "border: none; background: #fff; box-shadow: none; padding: 10mm;";
+
+  // Make story text appropriate size for PDF
+  const storyText = clone.querySelector(".story-text");
+  if (storyText) {
+    storyText.style.fontSize = "20pt";
+    storyText.style.lineHeight = "2.0";
+    storyText.style.fontWeight = "600";
+    storyText.style.letterSpacing = "0.02em";
+  }
+
+  document.body.appendChild(wrapper);
+
+  const humorType = HUMOR_TYPES.find(h => h.id === activeHumorId);
+  const filename = `Lesetext_${humorType && humorType.prompt ? humorType.label + "_" : ""}${new Date().toISOString().slice(0,10)}.pdf`;
+
+  html2pdf().set({
+    margin: 0,
+    filename: filename,
+    image: { type: "jpeg", quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true, backgroundColor: "#ffffff" },
+    jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+  }).from(wrapper).save().then(() => {
+    document.body.removeChild(wrapper);
+    btn.textContent = "📄 Als PDF speichern";
+    btn.disabled = false;
+  }).catch(() => {
+    document.body.removeChild(wrapper);
+    btn.textContent = "📄 Als PDF speichern";
+    btn.disabled = false;
+  });
+}
+
+/* ══════════════════════════════════════════
+   HINT CARD / API-KEY STATE
+══════════════════════════════════════════ */
+function apiKeyOk() {
+  const v = document.getElementById("api-key").value.trim();
+  return v.startsWith("sk-") && v.length > 10;
+}
+
+/* ══════════════════════════════════════════
+   API-KEY AUF DEM GERÄT MERKEN
+   Liegt ausschließlich im localStorage dieses Browsers – der Key
+   verlässt das Gerät nur als Authorization-Header Richtung OpenAI.
+══════════════════════════════════════════ */
+const KEY_STORAGE = "lesetext-generator.apiKey";
+
+function storageAvailable() {
+  try {
+    localStorage.setItem("__t", "1");
+    localStorage.removeItem("__t");
+    return true;
+  } catch { return false; }   // Privater Modus, gesperrte Website-Daten …
+}
+
+function persistApiKey() {
+  if (!storageAvailable()) return;
+  const remember = document.getElementById("remember-key").checked;
+  const v = document.getElementById("api-key").value.trim();
+  try {
+    if (remember && v) localStorage.setItem(KEY_STORAGE, v);
+    else localStorage.removeItem(KEY_STORAGE);
+  } catch { /* Speicher voll oder gesperrt – kein Grund, die App zu stoppen */ }
+  document.getElementById("forget-key").hidden = !(remember && v);
+}
+
+function forgetApiKey() {
+  try { localStorage.removeItem(KEY_STORAGE); } catch { /* egal */ }
+  document.getElementById("api-key").value = "";
+  document.getElementById("remember-key").checked = false;
+  document.getElementById("forget-key").hidden = true;
+  updateApiKeyState();
+}
+
+function restoreApiKey() {
+  const box = document.getElementById("remember-key");
+  if (!storageAvailable()) {
+    box.disabled = true;
+    box.parentElement.title = "In diesem Browser nicht verfügbar (privater Modus?)";
+    return;
+  }
+  let saved = null;
+  try { saved = localStorage.getItem(KEY_STORAGE); } catch { /* egal */ }
+  if (saved) {
+    document.getElementById("api-key").value = saved;
+    box.checked = true;
+    document.getElementById("forget-key").hidden = false;
+  }
+}
+
+function updateApiKeyState() {
+  const ok = apiKeyOk();
+  document.getElementById("key-dot").classList.toggle("active", ok);
+  document.getElementById("api-bar").classList.toggle("filled", ok);
+  document.getElementById("settings-dot").classList.toggle("hidden", ok);
+  document.getElementById("hint-apikey").style.display = ok ? "none" : "block";
+}
+
+function updateHintCard() {
+  const h = HUMOR_TYPES.find(t => t.id === activeHumorId);
+  const show = !!(h && h.prompt);
+  document.getElementById("hint-humor").style.display = show ? "block" : "none";
+  document.getElementById("hint-humor-val").textContent = show ? h.icon + " " + h.label : "";
+  updateApiKeyState();
+}
+
+/* ══════════════════════════════════════════
+   SETTINGS MODAL
+══════════════════════════════════════════ */
+function openSettings()  { document.getElementById("settings-modal").classList.add("open"); }
+function closeSettings() { document.getElementById("settings-modal").classList.remove("open"); updateHintCard(); }
+
+document.getElementById("remember-key").addEventListener("change", persistApiKey);
+document.getElementById("forget-key").addEventListener("click", forgetApiKey);
+
+document.querySelectorAll("#variant-row .variant-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    variantCount = parseInt(btn.dataset.n, 10);
+    document.querySelectorAll("#variant-row .variant-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
+});
+
+document.getElementById("btn-settings").addEventListener("click", openSettings);
+document.getElementById("hint-settings-link").addEventListener("click", openSettings);
+document.getElementById("settings-close").addEventListener("click", closeSettings);
+document.getElementById("settings-apply").addEventListener("click", closeSettings);
+document.getElementById("settings-modal").addEventListener("click", e => {
+  if (e.target.id === "settings-modal") closeSettings();
+});
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") closeSettings();
+});
+
+/* ── Init ── */
+restoreApiKey();
+buildHumorGrid();
+buildSoundCard();
+updateSelectedDisplay();
+updateHintCard();
+</script>
+</body>
+</html>
