@@ -1836,6 +1836,8 @@ const QUIZ_PRAISE = ["Super gelesen! 🎉", "Juhu, richtig! 🥳", "Genau! Du bi
 const QUIZ_NUDGE  = ["Hoppla – fast! Lies nochmal nach. 🔍", "Nicht ganz! Schau nochmal in den Text. 👀", "Knapp daneben – du schaffst das! 💪"];
 let quizToken = 0;     // verwirft Antworten zu einem inzwischen veralteten Text
 let quizState = null;  // { answer, solved }
+let quizAsked = [];    // bereits gestellte Fragen zum aktuellen Text – für „Neue Frage“
+let quizAskedFor = "";
 
 function quizKey(typ, word) {
   let k = String(word || "").trim().toLowerCase();
@@ -1852,8 +1854,13 @@ function shuffle(arr) {
   return a;
 }
 
-async function fetchQuiz(apiKey, storyText) {
+async function fetchQuiz(apiKey, storyText, asked) {
   const soundList = [...selected].sort().join(", ");
+  const avoid = asked.length ? `
+SCHON GESTELLT – stelle eine ANDERE Frage zu einem ANDEREN Detail mit einer ANDEREN Antwort:
+${asked.map(a => `- "${a.frage}" (Antwort: ${a.antwort})`).join("\n")}
+Nur wenn der Text wirklich kein anderes Farb- oder Tierdetail hat, darf die Antwort gleich bleiben – dann aber deutlich anders fragen.
+` : "";
   const prompt = `Du bist Grundschullehrer:in. Stelle zu diesem Lesetext für Erstleser GENAU EINE Verständnisfrage.
 
 Die Antwort ist entweder eine FARBE oder ein TIER und muss sich eindeutig aus dem Text ergeben – man soll sie nur wissen können, wenn man den Text gelesen hat.
@@ -1867,14 +1874,14 @@ DIE FRAGE:
 - nennt die Antwort NICHT selbst
 
 ABLENKER: 3 weitere falsche Antworten desselben Typs aus der Liste. Gut sind Ablenker, die im Text auch vorkommen, aber nicht die Antwort sind.
-
+${avoid}
 Text:
 ${storyText}
 
 Antworte NUR mit JSON: {"typ":"farbe" oder "tier","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
 
   const q = JSON.parse(await callOpenAI(apiKey, {
-    model:"gpt-4o", max_tokens:200, temperature:0.5,
+    model:"gpt-4o", max_tokens:200, temperature: asked.length ? 0.9 : 0.5,
     messages:[{ role:"user", content: prompt }],
     response_format:{ type:"json_object" }
   }));
@@ -1934,6 +1941,7 @@ async function buildQuiz() {
 
   const token = ++quizToken;
   quizState = null;
+  if (quizAskedFor !== currentRawText) { quizAsked = []; quizAskedFor = currentRawText; }
   const card = document.getElementById("quiz-card");
   const newBtn = document.getElementById("quiz-new");
   document.getElementById("quiz-question").innerHTML = "";
@@ -1945,8 +1953,9 @@ async function buildQuiz() {
   card.hidden = false;
 
   try {
-    const quiz = await fetchQuiz(apiKey, currentRawText);
+    const quiz = await fetchQuiz(apiKey, currentRawText, quizAsked);
     if (token !== quizToken) return;
+    quizAsked.push({ frage: quiz.question, antwort: quiz.answer });
     renderQuiz(quiz);
   } catch (err) {
     if (token !== quizToken) return;
