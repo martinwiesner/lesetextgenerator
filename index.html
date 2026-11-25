@@ -1797,7 +1797,8 @@ async function generate(prevText = null, prevErrors = null) {
 ERLAUBTE LAUTE (vollständige Liste): ${soundList}
 Verbotene Beispiele: ${getExampleForbidden()}
 Großbuchstaben der erlaubten Laute sind ok (Nomen). Doppelte Konsonanten (nn, mm, tt) erlaubt wenn der Einzellaut erlaubt ist.
-Kein Wort länger als ${wordLen} Buchstaben. Text ca. ${textLen} Wörter. Kurze Sätze, viel Dialog.
+Kein Wort länger als ${wordLen} Buchstaben. Kurze Sätze, viel Dialog.
+TEXTLÄNGE: HÖCHSTENS ${textLen} Wörter (gut: ${Math.round(textLen * 0.8)}–${textLen}). Das ist eine harte Obergrenze – lieber etwas kürzer als zu lang. Plane die Geschichte so knapp, dass sie in diese Länge passt, statt sie auszuschmücken.
 Schreibe JEDES Wort normal am Stück, NIEMALS mit Bindestrich getrennt (also "abgehoben", nicht "ab-ge-ho-ben").
 
 ${humorType.prompt ? `\n${humorType.prompt}\n` : ""}
@@ -1832,6 +1833,9 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
         messages: [{ role:"user", content: prompt }]
       }));
     }
+    if (isFirstGeneration) {
+      text = await enforceLength(apiKey, text, parseInt(textLen, 10), soundList, wordLen);
+    }
     currentRawText = text;
 
     const errors = validateText(text);
@@ -1842,8 +1846,8 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
 
     if (errors.length === 0) {
       setStatus(storyVariants.length > 1
-        ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert!${modelNote()}`
-        : `✓ Text generiert und validiert!${modelNote()}`, "ok");
+        ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert! · ${countWords(text)} Wörter${modelNote()}`
+        : `✓ Text generiert und validiert! · ${countWords(text)} Wörter${modelNote()}`, "ok");
       updateProgress(attemptCount, MAX_ATTEMPTS, "done");
       buildQuiz();
     } else if (attemptCount < MAX_ATTEMPTS) {
@@ -1861,6 +1865,45 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
   } finally {
     setLoading(false);
   }
+}
+
+/* ══════════════════════════════════════════
+   TEXTLÄNGE
+   Die KI überzieht die Wortvorgabe gern deutlich. Deshalb wird nach dem
+   Erzeugen gezählt und ein zu langer Text gezielt gekürzt – bevor die
+   Lautkorrektur läuft, damit sie nicht an später gestrichenen Wörtern arbeitet.
+══════════════════════════════════════════ */
+const LENGTH_TOLERANCE = 1.15;   // bis 15 % über der Vorgabe wird nicht gekürzt
+
+function countWords(text) {
+  return (text.match(/[a-zA-ZäöüÄÖÜß]+/g) || []).length;
+}
+
+async function enforceLength(apiKey, text, target, soundList, wordLen) {
+  const limit = Math.round(target * LENGTH_TOLERANCE);
+  for (let i = 0; i < 2 && countWords(text) > limit; i++) {
+    const n = countWords(text);
+    setStatus(`Text hat ${n} statt höchstens ${target} Wörter – kürze …`, "info");
+    try {
+      const shorter = stripStrayHyphens(await callAI(apiKey, {
+        max_tokens: 600, temperature: 0.4,
+        messages: [{ role:"user", content:
+`Kürze diesen Lesetext für Erstleser auf HÖCHSTENS ${target} Wörter (jetzt sind es ${n}).
+- Streiche Nebensächliches und fasse zusammen. Die Handlung bleibt verständlich, das Ende bzw. die Pointe bleibt erhalten.${quizEnabled ? "\n- Das wichtige Farb- oder Tierdetail bleibt drin." : ""}
+- Nimm möglichst nur Wörter, die schon im Text stehen. Neue Wörter nur mit diesen Lauten: ${soundList}. Kein Wort länger als ${wordLen} Buchstaben.
+- Zeilenumbrüche wie im Original, keine Bindestriche in Wörtern.
+Gib NUR den gekürzten Text zurück, ohne Kommentar.
+
+Text:
+${text}` }]
+      }));
+      const m = countWords(shorter);
+      // Nur übernehmen, wenn wirklich kürzer und nicht zu einem Stummel zusammengestrichen
+      if (m >= n || m < target * 0.5) break;
+      text = shorter;
+    } catch { break; }   // Kürzen ist ein Extra – Fehler hier dürfen die Generierung nicht stoppen
+  }
+  return text;
 }
 
 function getExampleForbidden() {
