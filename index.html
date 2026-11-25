@@ -648,6 +648,14 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
       <button class="key-forget" id="forget-key" hidden>Vom Gerät löschen</button>
     </div>
 
+    <div class="modal-label">KI-Modell</div>
+    <div class="variant-row" id="model-row">
+      <button class="variant-btn active" data-model="gpt-5">GPT-5</button>
+      <button class="variant-btn" data-model="gpt-4.1">GPT-4.1</button>
+      <button class="variant-btn" data-model="gpt-4o">GPT-4o</button>
+    </div>
+    <div class="variant-note">Gilt für Texte, Korrekturen, Variantenauswahl und Lesefrage. GPT-5 schreibt und prüft am gründlichsten, ist aber langsamer und teurer. Ist ein Modell für deinen Key nicht freigeschaltet, wird automatisch GPT-4o genutzt.</div>
+
     <div class="modal-label">Textart</div>
     <div class="humor-grid" id="humor-grid"></div>
 
@@ -666,14 +674,6 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
         <span class="schema-steps">Nach dem Text kommt eine Verständnisfrage – die Antwort wird per Farbklecks oder Tier angetippt.</span>
       </span>
     </label>
-
-    <div class="modal-label">KI-Modell für die Lesefrage</div>
-    <div class="variant-row" id="quiz-model-row">
-      <button class="variant-btn active" data-model="gpt-5">GPT-5</button>
-      <button class="variant-btn" data-model="gpt-4.1">GPT-4.1</button>
-      <button class="variant-btn" data-model="gpt-4o">GPT-4o</button>
-    </div>
-    <div class="variant-note">Jede Frage wird von einem zweiten, unabhängigen KI-Aufruf blind gegengeprüft: Nur wenn die Antwort eindeutig im Text steht, wird sie gezeigt. GPT-5 prüft am gründlichsten, ist aber etwas langsamer. Ist ein Modell für deinen Key nicht freigeschaltet, wird automatisch GPT-4o genutzt.</div>
 
     <div class="modal-label">Varianten</div>
     <div class="variant-row" id="variant-row">
@@ -1600,6 +1600,28 @@ async function callOpenAI(apiKey, opts) {
   return (data.choices[0].message.content || "").trim();
 }
 
+let aiModel = "gpt-5";        // Einstellungen → KI-Modell für Texte und Lesefrage
+let aiModelFallback = false;  // Modell nicht freigeschaltet → gpt-4o
+
+// Hinweis in der Statuszeile, falls das gewählte Modell nicht verfügbar war
+function modelNote() { return aiModelFallback ? ` (mit GPT-4o – ${aiModel} ist für deinen Key nicht freigeschaltet)` : ""; }
+
+function activeModel() { return aiModelFallback ? "gpt-4o" : aiModel; }
+
+async function callAI(apiKey, opts) {
+  const model = activeModel();
+  try {
+    return await callOpenAI(apiKey, Object.assign({}, opts, { model }));
+  } catch (err) {
+    // Key ohne Zugriff auf das gewählte Modell → einmalig auf gpt-4o ausweichen
+    if (model !== "gpt-4o" && /model/i.test(err.message)) {
+      aiModelFallback = true;
+      return callOpenAI(apiKey, Object.assign({}, opts, { model: "gpt-4o" }));
+    }
+    throw err;
+  }
+}
+
 /* ══════════════════════════════════════════
    BEST-OF-N: mehrere Texte erzeugen, den besten wählen
 ══════════════════════════════════════════ */
@@ -1630,8 +1652,8 @@ ${texts}
 Antworte NUR mit JSON: {"beste": <Nummer von 1 bis ${candidates.length}>, "grund": "<höchstens 10 Wörter>"}`;
 
   try {
-    const raw = await callOpenAI(apiKey, {
-      model: "gpt-4o", max_tokens: 120, temperature: 0,
+    const raw = await callAI(apiKey, {
+      max_tokens: 120, temperature: 0,
       messages: [{ role:"user", content: prompt }],
       response_format: { type:"json_object" }
     });
@@ -1649,8 +1671,8 @@ async function generateVariants(apiKey, prompt, n) {
   setStatus(`Erzeuge ${n} Varianten …`, "info");
 
   const results = await Promise.allSettled(
-    Array.from({ length: n }, () => callOpenAI(apiKey, {
-      model: "gpt-4o", max_tokens: 600, temperature: 0.9,
+    Array.from({ length: n }, () => callAI(apiKey, {
+      max_tokens: 600, temperature: 0.9,
       messages: [{ role:"user", content: prompt }]
     }))
   );
@@ -1759,16 +1781,14 @@ async function generate(prevText = null, prevErrors = null) {
   updateProgress(attemptCount, MAX_ATTEMPTS, "running");
 
   /* ── Build prompt ── */
-  let prompt, model;
+  let prompt;
 
   if (prevText && prevErrors) {
     /* CORRECTION: targeted word-substitution — cheaper model */
     prompt = buildCorrectionPrompt(prevText, prevErrors, wordLen, soundList);
-    model  = "gpt-4o";  // still 4o for quality, but prompt is much shorter
     setStatus(`Gezielte Korrektur (${prevErrors.length} Wort${prevErrors.length>1?"e":""}) – Versuch ${attemptCount}/${MAX_ATTEMPTS} …`, "warn");
   } else {
     /* FIRST GENERATION */
-    model = "gpt-4o";
     const toneIntro = humorType.prompt
       ? "Du bist Grundschullehre:in und Witzeprofi. Schreibe einen deutschen Lesetext für Erstleser (Klasse 1), der wirklich lustig ist."
       : "Du bist Grundschullehre:in. Schreibe eine altersgerechte, spannende kleine Geschichte als deutschen Lesetext für Erstleser (Klasse 1).";
@@ -1807,8 +1827,8 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
       activeVariant = winner;
       text = candidates[winner].text;
     } else {
-      text = stripStrayHyphens(await callOpenAI(apiKey, {
-        model, max_tokens: 600, temperature: 0.8,
+      text = stripStrayHyphens(await callAI(apiKey, {
+        max_tokens: 600, temperature: 0.8,
         messages: [{ role:"user", content: prompt }]
       }));
     }
@@ -1822,8 +1842,8 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
 
     if (errors.length === 0) {
       setStatus(storyVariants.length > 1
-        ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert!`
-        : "✓ Text generiert und validiert!", "ok");
+        ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert!${modelNote()}`
+        : `✓ Text generiert und validiert!${modelNote()}`, "ok");
       updateProgress(attemptCount, MAX_ATTEMPTS, "done");
       buildQuiz();
     } else if (attemptCount < MAX_ATTEMPTS) {
@@ -1878,29 +1898,10 @@ let quizState = null;  // { answer, solved }
 let quizAsked = [];    // bereits gestellte Fragen zum aktuellen Text – für „Neue Frage“
 let quizAskedFor = "";
 const QUIZ_MAX_TRIES = 3;
-let quizModel = "gpt-5";       // Einstellungen → Modell für die Lesefrage
-let quizModelFallback = false; // Modell nicht freigeschaltet → gpt-4o
-
 /* Ungeeigneter Entwurf (z. B. nicht beantwortbar) – führt zu neuem Versuch,
    während echte API-Fehler (Key, Netz) sofort durchgereicht werden. */
 class QuizReject extends Error {}
 class QuizNoDetail extends Error {}
-
-function activeQuizModel() { return quizModelFallback ? "gpt-4o" : quizModel; }
-
-async function callQuizModel(apiKey, opts) {
-  const model = activeQuizModel();
-  try {
-    return await callOpenAI(apiKey, Object.assign({}, opts, { model }));
-  } catch (err) {
-    // Key ohne Zugriff auf das gewählte Modell → einmalig auf gpt-4o ausweichen
-    if (model !== "gpt-4o" && /model/i.test(err.message)) {
-      quizModelFallback = true;
-      return callOpenAI(apiKey, Object.assign({}, opts, { model: "gpt-4o" }));
-    }
-    throw err;
-  }
-}
 
 function parseQuizJSON(raw) {
   try { return JSON.parse(raw); }
@@ -1968,7 +1969,7 @@ Antworte NUR mit JSON: {"antwort":"<eine der Möglichkeiten oder null>","beleg":
 
   let r;
   try {
-    r = JSON.parse(await callQuizModel(apiKey, {
+    r = JSON.parse(await callAI(apiKey, {
       max_tokens:200, temperature:0,
       messages:[{ role:"user", content: prompt }],
       response_format:{ type:"json_object" }
@@ -2027,7 +2028,7 @@ ${storyText}
 
 Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
 
-  const q = parseQuizJSON(await callQuizModel(apiKey, {
+  const q = parseQuizJSON(await callAI(apiKey, {
     max_tokens:200, temperature: asked.length || rejected.length ? 0.9 : 0.5,
     messages:[{ role:"user", content: prompt }],
     response_format:{ type:"json_object" }
@@ -2057,7 +2058,7 @@ Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","an
   let errors = validateText(question);
   if (errors.length) {
     try {
-      const r = JSON.parse(await callQuizModel(apiKey, {
+      const r = JSON.parse(await callAI(apiKey, {
         max_tokens:100, temperature:0.3,
         messages:[{ role:"user", content:
 `Formuliere diese Frage für Erstleser um: "${question}"
@@ -2123,8 +2124,8 @@ async function buildQuiz() {
     quizAsked.push({ frage: quiz.question, antwort: quiz.answer });
     renderQuiz(quiz);
     checked.textContent = "✓ geprüft";
-    checked.title = `Blind gegengeprüft: Die Antwort steht eindeutig im Text. Modell: ${activeQuizModel()}` +
-      (quizModelFallback ? ` (${quizModel} nicht verfügbar)` : "");
+    checked.title = `Blind gegengeprüft: Die Antwort steht eindeutig im Text. Modell: ${activeModel()}` +
+      (aiModelFallback ? ` (${aiModel} nicht verfügbar)` : "");
     checked.hidden = false;
   } catch (err) {
     if (token !== quizToken) return;
@@ -2511,11 +2512,11 @@ document.getElementById("quiz-toggle").addEventListener("change", e => {
 });
 document.getElementById("quiz-new").addEventListener("click", buildQuiz);
 
-document.querySelectorAll("#quiz-model-row .variant-btn").forEach(btn => {
+document.querySelectorAll("#model-row .variant-btn").forEach(btn => {
   btn.addEventListener("click", () => {
-    quizModel = btn.dataset.model;
-    quizModelFallback = false;
-    document.querySelectorAll("#quiz-model-row .variant-btn").forEach(b => b.classList.remove("active"));
+    aiModel = btn.dataset.model;
+    aiModelFallback = false;
+    document.querySelectorAll("#model-row .variant-btn").forEach(b => b.classList.remove("active"));
     btn.classList.add("active");
   });
 });
