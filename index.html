@@ -412,6 +412,12 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
   display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 100px;
   background: #f3ecff; border: 1px solid #d6c4f5; color: #5b30a8; font-size: 12px; font-weight: 800;
 }
+.quiz-badges { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.quiz-checked {
+  padding: 3px 10px; border-radius: 100px; background: #eaf6f0; border: 1px solid #9ecfb5;
+  color: #1d7048; font-size: 11px; font-weight: 800; cursor: help;
+}
+.quiz-checked[hidden] { display: none; }
 .quiz-new {
   font-family: inherit; font-size: 12px; font-weight: 700; color: #888; background: #f5f3ef;
   border: 1.5px solid #dedad4; border-radius: 100px; padding: 5px 12px; cursor: pointer;
@@ -598,7 +604,10 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
     </div>
     <div class="quiz-card" id="quiz-card" hidden>
       <div class="quiz-head">
-        <span class="quiz-badge">🧠 Lesefrage</span>
+        <span class="quiz-badges">
+          <span class="quiz-badge">🧠 Lesefrage</span>
+          <span class="quiz-checked" id="quiz-checked" hidden></span>
+        </span>
         <button class="quiz-new" id="quiz-new">↻ Neue Frage</button>
       </div>
       <div class="quiz-question" id="quiz-question"></div>
@@ -657,6 +666,14 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
         <span class="schema-steps">Nach dem Text kommt eine Verständnisfrage – die Antwort wird per Farbklecks oder Tier angetippt.</span>
       </span>
     </label>
+
+    <div class="modal-label">KI-Modell für die Lesefrage</div>
+    <div class="variant-row" id="quiz-model-row">
+      <button class="variant-btn active" data-model="gpt-5">GPT-5</button>
+      <button class="variant-btn" data-model="gpt-4.1">GPT-4.1</button>
+      <button class="variant-btn" data-model="gpt-4o">GPT-4o</button>
+    </div>
+    <div class="variant-note">Jede Frage wird von einem zweiten, unabhängigen KI-Aufruf blind gegengeprüft: Nur wenn die Antwort eindeutig im Text steht, wird sie gezeigt. GPT-5 prüft am gründlichsten, ist aber etwas langsamer. Ist ein Modell für deinen Key nicht freigeschaltet, wird automatisch GPT-4o genutzt.</div>
 
     <div class="modal-label">Varianten</div>
     <div class="variant-row" id="variant-row">
@@ -1561,15 +1578,26 @@ function stripStrayHyphens(text) {
 /* ══════════════════════════════════════════
    OPENAI-AUFRUF (eine Stelle für alle Calls)
 ══════════════════════════════════════════ */
+// Reasoning-Modelle (GPT-5, o-Reihe) kennen kein temperature und brauchen
+// max_completion_tokens – inkl. Puffer für die internen Denk-Tokens.
+function isReasoningModel(model) { return /^(gpt-5|o\d)/.test(model); }
+
 async function callOpenAI(apiKey, opts) {
+  const body = Object.assign({ model:"gpt-4o", max_tokens:600, temperature:0.8 }, opts);
+  if (isReasoningModel(body.model)) {
+    body.max_completion_tokens = Math.max(4000, body.max_tokens * 8);
+    delete body.max_tokens;
+    delete body.temperature;
+    if (!body.reasoning_effort) body.reasoning_effort = "low";
+  }
   const resp = await fetch("https://api.openai.com/v1/chat/completions", {
     method: "POST",
     headers: { "Content-Type":"application/json", "Authorization":`Bearer ${apiKey}` },
-    body: JSON.stringify(Object.assign({ model:"gpt-4o", max_tokens:600, temperature:0.8 }, opts))
+    body: JSON.stringify(body)
   });
   const data = await resp.json();
   if (data.error) throw new Error(data.error.message);
-  return data.choices[0].message.content.trim();
+  return (data.choices[0].message.content || "").trim();
 }
 
 /* ══════════════════════════════════════════
@@ -1849,6 +1877,35 @@ let quizToken = 0;     // verwirft Antworten zu einem inzwischen veralteten Text
 let quizState = null;  // { answer, solved }
 let quizAsked = [];    // bereits gestellte Fragen zum aktuellen Text – für „Neue Frage“
 let quizAskedFor = "";
+const QUIZ_MAX_TRIES = 3;
+let quizModel = "gpt-5";       // Einstellungen → Modell für die Lesefrage
+let quizModelFallback = false; // Modell nicht freigeschaltet → gpt-4o
+
+/* Ungeeigneter Entwurf (z. B. nicht beantwortbar) – führt zu neuem Versuch,
+   während echte API-Fehler (Key, Netz) sofort durchgereicht werden. */
+class QuizReject extends Error {}
+class QuizNoDetail extends Error {}
+
+function activeQuizModel() { return quizModelFallback ? "gpt-4o" : quizModel; }
+
+async function callQuizModel(apiKey, opts) {
+  const model = activeQuizModel();
+  try {
+    return await callOpenAI(apiKey, Object.assign({}, opts, { model }));
+  } catch (err) {
+    // Key ohne Zugriff auf das gewählte Modell → einmalig auf gpt-4o ausweichen
+    if (model !== "gpt-4o" && /model/i.test(err.message)) {
+      quizModelFallback = true;
+      return callOpenAI(apiKey, Object.assign({}, opts, { model: "gpt-4o" }));
+    }
+    throw err;
+  }
+}
+
+function parseQuizJSON(raw) {
+  try { return JSON.parse(raw); }
+  catch { throw new QuizReject("Antwort war kein gültiges JSON."); }
+}
 
 function quizKey(typ, word) {
   let k = String(word || "").trim().toLowerCase();
@@ -1865,42 +1922,124 @@ function shuffle(arr) {
   return a;
 }
 
-async function fetchQuiz(apiKey, storyText, asked) {
+/* Erzeugt einen Fragen-Entwurf, prüft ihn blind gegen den Text und versucht
+   es bei Problemen erneut – mit den verworfenen Fragen als Rückmeldung. */
+async function fetchQuiz(apiKey, storyText, asked, onStage) {
+  const rejected = [];
+  for (let attempt = 1; attempt <= QUIZ_MAX_TRIES; attempt++) {
+    onStage(attempt === 1 ? "Ich denke mir eine Frage aus" : `Die war nicht eindeutig – neuer Versuch (${attempt}/${QUIZ_MAX_TRIES})`);
+    let quiz;
+    try {
+      quiz = await draftQuiz(apiKey, storyText, asked, rejected);
+    } catch (err) {
+      if (!(err instanceof QuizReject)) throw err;
+      rejected.push({ frage: "–", antwort: "–", grund: err.message });
+      continue;
+    }
+    onStage("Ich prüfe, ob man die Frage aus dem Text beantworten kann");
+    const check = await checkQuiz(apiKey, storyText, quiz);
+    if (check.ok) return quiz;
+    rejected.push({ frage: quiz.question, antwort: quiz.answer, grund: check.reason });
+  }
+  throw new Error("Zu diesem Text fand ich keine eindeutig beantwortbare Farb- oder Tierfrage. Probier „Neue Frage“ oder erstelle einen neuen Text.");
+}
+
+/* Blinde Gegenprobe: Ein zweiter Aufruf kennt die gewünschte Antwort NICHT und
+   muss die Frage allein aus dem Text lösen. Nur wenn er auf dieselbe Antwort
+   kommt und die Frage eindeutig findet, wird sie gezeigt. */
+async function checkQuiz(apiKey, storyText, quiz) {
+  const map = quiz.typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS;
+  const labels = quiz.options.map(k => k.charAt(0).toUpperCase() + k.slice(1));
+  const prompt = `Du prüfst eine Leseverständnisfrage für Erstleser (Klasse 1).
+Beantworte sie AUSSCHLIESSLICH mit dem, was im Text ausdrücklich steht – kein Weltwissen, keine Vermutung, kein „wahrscheinlich“.
+
+Text:
+${storyText}
+
+Frage: ${quiz.question}
+Antwortmöglichkeiten: ${labels.join(", ")}
+
+Prüfe streng:
+1. Welche Antwortmöglichkeit steht laut Text fest? Wird die Farbe bzw. das Tier im Text gar nicht genannt, ist die Antwort null.
+2. Treffen mehrere Möglichkeiten zu? Dann ist die Frage nicht eindeutig.
+3. Ist klar, wer oder was gemeint ist, sodass ein Kind die Frage versteht?
+
+Antworte NUR mit JSON: {"antwort":"<eine der Möglichkeiten oder null>","beleg":"<wörtliche Textstelle oder leer>","eindeutig":true oder false,"problem":"<kurz, falls es ein Problem gibt, sonst leer>"}`;
+
+  let r;
+  try {
+    r = JSON.parse(await callQuizModel(apiKey, {
+      max_tokens:200, temperature:0,
+      messages:[{ role:"user", content: prompt }],
+      response_format:{ type:"json_object" }
+    }));
+  } catch (err) {
+    if (err instanceof SyntaxError) return { ok: false, reason: "Prüfung lieferte kein gültiges Ergebnis." };
+    throw err;
+  }
+  const got = r.antwort ? quizKey(quiz.typ, r.antwort) : null;
+  if (!got || !map[got]) {
+    return { ok: false, reason: r.problem || "Die Antwort steht nicht im Text." };
+  }
+  if (got !== quiz.answer) {
+    return { ok: false, reason: `Prüfung kam auf „${got}“ statt „${quiz.answer}“. ${r.problem || ""}`.trim() };
+  }
+  if (r.eindeutig !== true) {
+    return { ok: false, reason: r.problem || "Mehrere Antworten passen." };
+  }
+  return { ok: true };
+}
+
+async function draftQuiz(apiKey, storyText, asked, rejected) {
   const soundList = [...selected].sort().join(", ");
   const avoid = asked.length ? `
 SCHON GESTELLT – stelle eine ANDERE Frage zu einem ANDEREN Detail mit einer ANDEREN Antwort:
 ${asked.map(a => `- "${a.frage}" (Antwort: ${a.antwort})`).join("\n")}
 Nur wenn der Text wirklich kein anderes Farb- oder Tierdetail hat, darf die Antwort gleich bleiben – dann aber deutlich anders fragen.
 ` : "";
+  const failed = rejected.length ? `
+VERWORFEN – diese Entwürfe waren nicht beantwortbar oder nicht eindeutig. Mach es besser:
+${rejected.map(r => `- "${r.frage}" (Antwort: ${r.antwort}) → ${r.grund}`).join("\n")}
+` : "";
   const prompt = `Du bist Grundschullehrer:in. Stelle zu diesem Lesetext für Erstleser GENAU EINE Verständnisfrage.
 
-Die Antwort ist entweder eine FARBE oder ein TIER und muss sich eindeutig aus dem Text ergeben – man soll sie nur wissen können, wenn man den Text gelesen hat.
+Die Antwort ist entweder eine FARBE oder ein TIER.
 Mögliche Farben: ${Object.keys(QUIZ_COLORS).join(", ")}
 Mögliche Tiere: ${Object.keys(QUIZ_ANIMALS).join(", ")}
-Wähle den Typ, der zum Text passt. Die Antwort muss exakt eines dieser Wörter sein.
+Die Antwort muss exakt eines dieser Wörter sein.
+
+GANZ WICHTIG – die Frage muss beantwortbar sein:
+- Die Antwort-Farbe bzw. das Antwort-Tier muss im Text AUSDRÜCKLICH genannt werden (z. B. „Das Boot ist rot.“, „Der Frosch ruft …“).
+- Frage NIEMALS nach etwas, das im Text nicht steht, und lass das Kind nichts raten oder erschließen.
+- Es darf nur genau eine der vier Möglichkeiten passen. Ablenker dürfen auf die Frage NICHT zutreffen.
+- Kommt im Text keine Farbe und kein Tier aus den Listen vor, antworte {"typ":"keine"}.
 
 DIE FRAGE:
 - ein kurzer Satz, höchstens 8 Wörter, mit Fragezeichen
+- klar, wer oder was gemeint ist
 - möglichst nur mit diesen Lauten: ${soundList} (Großbuchstaben und Doppelkonsonanten ok)
 - nennt die Antwort NICHT selbst
 
-ABLENKER: 3 weitere falsche Antworten desselben Typs aus der Liste. Gut sind Ablenker, die im Text auch vorkommen, aber nicht die Antwort sind.
-${avoid}
+ABLENKER: 3 weitere falsche Antworten desselben Typs aus der Liste. Gut sind Ablenker, die im Text auch vorkommen, aber nicht die Antwort auf DIESE Frage sind.
+${avoid}${failed}
 Text:
 ${storyText}
 
-Antworte NUR mit JSON: {"typ":"farbe" oder "tier","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
+Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
 
-  const q = JSON.parse(await callOpenAI(apiKey, {
-    model:"gpt-4o", max_tokens:200, temperature: asked.length ? 0.9 : 0.5,
+  const q = parseQuizJSON(await callQuizModel(apiKey, {
+    max_tokens:200, temperature: asked.length || rejected.length ? 0.9 : 0.5,
     messages:[{ role:"user", content: prompt }],
     response_format:{ type:"json_object" }
   }));
 
+  if (q.typ === "keine") {
+    throw new QuizNoDetail("In diesem Text kommt keine Farbe und kein Tier vor, nach dem man fragen könnte. Erstelle einen neuen Text – bei eingeschalteter Lesefrage baut die KI so ein Detail gezielt ein.");
+  }
   const typ = q.typ === "farbe" || q.typ === "tier" ? q.typ : null;
   const answer = typ && quizKey(typ, q.antwort);
   if (!answer || typeof q.frage !== "string" || !q.frage.trim()) {
-    throw new Error("Zu diesem Text fiel mir keine Farb- oder Tierfrage ein.");
+    throw new QuizReject("Antwort war kein Wort aus der Farb- bzw. Tierliste.");
   }
 
   const options = [answer];
@@ -1918,8 +2057,8 @@ Antworte NUR mit JSON: {"typ":"farbe" oder "tier","frage":"...","antwort":"...",
   let errors = validateText(question);
   if (errors.length) {
     try {
-      const r = JSON.parse(await callOpenAI(apiKey, {
-        model:"gpt-4o", max_tokens:100, temperature:0.3,
+      const r = JSON.parse(await callQuizModel(apiKey, {
+        max_tokens:100, temperature:0.3,
         messages:[{ role:"user", content:
 `Formuliere diese Frage für Erstleser um: "${question}"
 Die Antwort (${answer}) muss gleich bleiben und darf nicht in der Frage stehen.
@@ -1936,6 +2075,10 @@ Höchstens 8 Wörter. Antworte NUR mit JSON: {"frage":"..."}` }],
     } catch { /* erste Fassung behalten */ }
   }
 
+  // Wortanfang statt Teilstring – sonst würde „rot“ in „Brot“ fälschlich anschlagen
+  if (question.toLowerCase().split(/[^a-zäöüß]+/).some(w => w.startsWith(answer))) {
+    throw new QuizReject("Die Frage verrät die Antwort.");
+  }
   return { typ, question, answer, options: shuffle(options), errors };
 }
 
@@ -1957,17 +2100,32 @@ async function buildQuiz() {
   const newBtn = document.getElementById("quiz-new");
   document.getElementById("quiz-question").innerHTML = "";
   document.getElementById("quiz-options").className = "quiz-options";
-  document.getElementById("quiz-options").innerHTML =
-    '<div class="quiz-loading">Ich denke mir eine Frage aus<span>.</span><span>.</span><span>.</span></div>';
+  const checked = document.getElementById("quiz-checked");
+  checked.hidden = true;
+  const onStage = text => {
+    if (token !== quizToken) return;
+    const box = document.getElementById("quiz-options");
+    box.innerHTML = "";
+    const el = document.createElement("div");
+    el.className = "quiz-loading";
+    el.textContent = text;
+    for (let i = 0; i < 3; i++) { const d = document.createElement("span"); d.textContent = "."; el.appendChild(d); }
+    box.appendChild(el);
+  };
+  onStage("Ich denke mir eine Frage aus");
   setQuizFeedback("", "");
   newBtn.disabled = true;
   card.hidden = false;
 
   try {
-    const quiz = await fetchQuiz(apiKey, currentRawText, quizAsked);
+    const quiz = await fetchQuiz(apiKey, currentRawText, quizAsked, onStage);
     if (token !== quizToken) return;
     quizAsked.push({ frage: quiz.question, antwort: quiz.answer });
     renderQuiz(quiz);
+    checked.textContent = "✓ geprüft";
+    checked.title = `Blind gegengeprüft: Die Antwort steht eindeutig im Text. Modell: ${activeQuizModel()}` +
+      (quizModelFallback ? ` (${quizModel} nicht verfügbar)` : "");
+    checked.hidden = false;
   } catch (err) {
     if (token !== quizToken) return;
     const box = document.getElementById("quiz-options");
@@ -2352,6 +2510,15 @@ document.getElementById("quiz-toggle").addEventListener("change", e => {
   else if (currentRawText && !loading) buildQuiz();
 });
 document.getElementById("quiz-new").addEventListener("click", buildQuiz);
+
+document.querySelectorAll("#quiz-model-row .variant-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    quizModel = btn.dataset.model;
+    quizModelFallback = false;
+    document.querySelectorAll("#quiz-model-row .variant-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+  });
+});
 
 document.getElementById("btn-settings").addEventListener("click", openSettings);
 document.getElementById("hint-settings-link").addEventListener("click", openSettings);
