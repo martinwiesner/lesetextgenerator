@@ -1107,6 +1107,7 @@ function renderMildenberger(rawText, errorsToHighlight) {
   textDiv.className = "story-text";
 
   const lines = rawText.split(/\n+/).filter(l=>l.trim());
+  let wordIdx = 0;   // Position des Worts im Gesamttext – damit nur genau dieses ersetzt wird
   lines.forEach((line, li) => {
     // Jede Zeile bekommt einen eigenen Container – der Abstand kommt aus dem CSS
     // (.story-line), nicht mehr aus doppelten <br>.
@@ -1116,12 +1117,14 @@ function renderMildenberger(rawText, errorsToHighlight) {
     const parts = line.match(/[a-zA-ZäöüÄÖÜß]+|[^a-zA-ZäöüÄÖÜß]+/g) || [];
     for (const part of parts) {
       if (/[a-zA-ZäöüÄÖÜß]/.test(part)) {
+        const idx = wordIdx++;
         const isErr = badWords.has(part.toLowerCase());
         if (isErr) {
           const badLaut = badMap[part.toLowerCase()];
           const span = document.createElement("span");
           span.className = "bad-word";
           span.dataset.word = part;
+          span.dataset.idx  = idx;
           span.dataset.bad  = badLaut;
           span.title = `Laut „${badLaut}" nicht eingeführt – klicken zum Bearbeiten`;
           span.textContent = part;
@@ -1134,6 +1137,7 @@ function renderMildenberger(rawText, errorsToHighlight) {
           const wordSpan = document.createElement("span");
           wordSpan.className = "editable-word";
           wordSpan.dataset.word = part;
+          wordSpan.dataset.idx  = idx;
           wordSpan.title = "Klicken zum Bearbeiten";
           const syls = syllabify(part);
           syls.forEach((syl, si) => {
@@ -1266,12 +1270,8 @@ function confirmInlineEdit(editState) {
   // Validate
   // Manuelle Korrektur wird immer übernommen – Lautfehler zeigt das Re-Render an,
   // eine Überschreitung der Wortlänge ist hier ausdrücklich erlaubt.
-  // Replace in raw text (case-aware)
-  const regex = new RegExp(originalWord.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), "gi");
-  currentRawText = currentRawText.replace(regex, m => {
-    if (m[0] === m[0].toUpperCase()) return newWord.charAt(0).toUpperCase() + newWord.slice(1);
-    return newWord;
-  });
+  // Nur das angeklickte Wort ersetzen, nicht jedes gleiche Wort im Text
+  currentRawText = replaceWordAt(currentRawText, Number(span.dataset.idx), newWord);
 
   // Clean up inline edit
   if (wrap.parentNode) wrap.parentNode.removeChild(wrap);
@@ -1288,6 +1288,18 @@ function confirmInlineEdit(editState) {
     setStatus("✓ Alle Laute korrekt nach manueller Anpassung!", "ok");
     updateProgress(MAX_ATTEMPTS, MAX_ATTEMPTS, "done");
   }
+}
+
+/* Ersetzt das idx-te Wort im Text (Zählung wie beim Rendern: jede Buchstabenfolge
+   ist ein Wort). Großschreibung am Wortanfang bleibt erhalten. */
+function replaceWordAt(text, idx, replacement) {
+  let n = 0;
+  return text.replace(/[a-zA-ZäöüÄÖÜß]+/g, m => {
+    if (n++ !== idx) return m;
+    return m[0] === m[0].toUpperCase()
+      ? replacement.charAt(0).toUpperCase() + replacement.slice(1)
+      : replacement;
+  });
 }
 
 function cancelInlineEdit(editState) {
@@ -1462,12 +1474,8 @@ function renderSynOptions(words, originalWord) {
 }
 
 function replaceBadWord(original, replacement) {
-  // Case-aware replacement in raw text
-  const regex = new RegExp(original, "gi");
-  currentRawText = currentRawText.replace(regex, m => {
-    if (m[0] === m[0].toUpperCase()) return replacement.charAt(0).toUpperCase() + replacement.slice(1);
-    return replacement;
-  });
+  if (!synActiveSpan) return;
+  currentRawText = replaceWordAt(currentRawText, Number(synActiveSpan.dataset.idx), replacement);
   closeSynPopover();
   // Re-validate and re-render
   const errors = validateText(currentRawText);
