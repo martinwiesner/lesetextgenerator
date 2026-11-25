@@ -398,6 +398,100 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
 .btn-print:hover { border-color: #2d9a65; color: #1d7048; background: #edf7f2; }
 .btn-pdf:hover   { border-color: #c05a00; color: #8a3a00; background: #fff5ec; }
 
+/* ═══ Lesefrage (Leseverständnis) ═══ */
+.quiz-card {
+  margin-top: 14px; background: #fff; border: 1.5px solid #e8e0b0; border-radius: 20px;
+  padding: 20px 24px 18px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); animation: slidein .25s ease;
+}
+.quiz-card[hidden] { display: none; }
+.quiz-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px; }
+.quiz-badge {
+  display: inline-flex; align-items: center; gap: 5px; padding: 4px 12px; border-radius: 100px;
+  background: #f3ecff; border: 1px solid #d6c4f5; color: #5b30a8; font-size: 12px; font-weight: 800;
+}
+.quiz-new {
+  font-family: inherit; font-size: 12px; font-weight: 700; color: #888; background: #f5f3ef;
+  border: 1.5px solid #dedad4; border-radius: 100px; padding: 5px 12px; cursor: pointer;
+}
+.quiz-new:hover:not(:disabled) { border-color: #b5b0aa; background: #eeebe6; }
+.quiz-new:disabled { opacity: .4; cursor: not-allowed; }
+.quiz-question { font-size: 28px; line-height: 1.5; font-weight: 700; letter-spacing: 0.02em; word-spacing: .08em; text-align: center; }
+.quiz-bad { border-bottom: 2px dotted #d44; }
+.quiz-loading, .quiz-error { text-align: center; color: #b0aba4; font-size: 14px; font-weight: 600; padding: 18px 0 8px; }
+.quiz-loading span { display: inline-block; animation: dotjump 1s infinite; }
+.quiz-loading span:nth-child(2) { animation-delay: .15s; }
+.quiz-loading span:nth-child(3) { animation-delay: .3s; }
+@keyframes dotjump { 0%,60%,100% { transform: none } 30% { transform: translateY(-5px) } }
+
+.quiz-options { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 14px; margin-top: 14px; }
+.qopt {
+  position: relative; width: 118px; padding: 26px 0 10px; background: none; border: none;
+  cursor: pointer; font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: opacity .3s, filter .3s;
+}
+.qopt:focus-visible { outline: 3px solid #9b5de5; outline-offset: 2px; border-radius: 18px; }
+.qopt::after {
+  content: ""; position: absolute; left: 22%; right: 22%; bottom: 4px; height: 10px;
+  background: radial-gradient(ellipse at center, rgba(0,0,0,.16), transparent 70%);
+}
+.qopt-idle { display: block; animation: bob 2.6s ease-in-out infinite; animation-delay: var(--d, 0s); }
+.qopt-body { display: block; transform-origin: 50% 100%; transition: transform .09s ease-out; }
+.qopt svg { display: block; width: 108px; height: 108px; margin: 0 auto; overflow: visible; }
+.qopt-body.animal {
+  width: 100px; height: 100px; margin: 4px auto; border-radius: 50% 50% 46% 46%;
+  background: radial-gradient(circle at 34% 28%, #fff 0, var(--bg) 62%);
+  border: 3px solid rgba(0,0,0,.12); box-shadow: inset 0 -7px 0 rgba(0,0,0,.07);
+  display: flex; align-items: center; justify-content: center; font-size: 60px; line-height: 1;
+}
+
+/* Quetschen beim Drücken, Nachfedern beim Loslassen */
+.qopt.pressed .qopt-body { transform: scale(1.24, .72); }
+.qopt.boing .qopt-body { animation: jelly .6s ease-out; }
+@keyframes bob   { 0%,100% { transform: translateY(0) rotate(-2deg) } 50% { transform: translateY(-6px) rotate(2deg) } }
+@keyframes jelly {
+  0% { transform: scale(1.24,.72) } 30% { transform: scale(.82,1.22) } 50% { transform: scale(1.1,.9) }
+  70% { transform: scale(.96,1.05) } 100% { transform: scale(1,1) }
+}
+@keyframes nope    { 0%,100% { transform: none } 20% { transform: translateX(-9px) rotate(-12deg) } 40% { transform: translateX(8px) rotate(10deg) } 60% { transform: translateX(-6px) rotate(-7deg) } 80% { transform: translateX(3px) rotate(3deg) } }
+@keyframes hooray  { 0%,100% { transform: none } 40% { transform: translateY(-26px) scale(1.12) rotate(-6deg) } 70% { transform: translateY(0) scale(1.08,.92) } }
+
+/* Gesichter: normal / richtig / falsch */
+.qopt .mouth-happy, .qopt .mouth-sad, .qopt .eye-happy, .qopt .brows, .qopt .sweat { display: none; }
+.qopt.is-right .mouth-normal, .qopt.is-right .eye { display: none; }
+.qopt.is-right .mouth-happy, .qopt.is-right .eye-happy { display: inline; }
+.qopt.is-wrong .mouth-normal { display: none; }
+.qopt.is-wrong .mouth-sad, .qopt.is-wrong .brows, .qopt.is-wrong .sweat { display: inline; }
+.qopt.is-right .qopt-idle { animation: hooray .7s cubic-bezier(.3,1.6,.6,1) 3; }
+.qopt.is-wrong .qopt-idle { animation: nope .7s ease-in-out; }
+.qopt.is-wrong .qopt-body { filter: saturate(.35) brightness(1.06); }
+.qopt.is-wrong { cursor: default; }
+.quiz-done .qopt:not(.is-right) { opacity: .35; filter: grayscale(.7); cursor: default; }
+
+.qopt-bubble {
+  position: absolute; top: 0; left: 50%; z-index: 2; white-space: nowrap; pointer-events: none;
+  padding: 3px 10px; border-radius: 14px; background: #fff; border: 2px solid #2a2230;
+  font-size: 14px; font-weight: 800; color: #2a2230;
+  opacity: 0; transform: translate(-50%, 4px) scale(.5);
+  transition: opacity .2s, transform .3s cubic-bezier(.3,1.6,.6,1);
+}
+.qopt-bubble::after {
+  content: ""; position: absolute; left: 50%; bottom: -7px; margin-left: -5px;
+  width: 10px; height: 10px; background: #fff; border: 2px solid #2a2230;
+  border-top: none; border-left: none; transform: rotate(45deg);
+}
+.qopt.is-right .qopt-bubble, .qopt.is-wrong .qopt-bubble { opacity: 1; transform: translate(-50%, -8px) scale(1); }
+
+.quiz-feedback { min-height: 30px; margin-top: 8px; text-align: center; font-size: 19px; font-weight: 800; }
+.quiz-feedback.ok    { color: #1d7048; animation: pop .45s cubic-bezier(.3,1.6,.6,1); }
+.quiz-feedback.wrong { color: #c0602a; animation: pop .45s cubic-bezier(.3,1.6,.6,1); }
+@keyframes pop { from { transform: scale(.6); opacity: 0 } to { transform: none; opacity: 1 } }
+
+#confetti-canvas { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 300; }
+
+@media (prefers-reduced-motion: reduce) {
+  .qopt-idle { animation: none; }
+}
+
 /* ═══ Touch-Geräte (iPad) ═══
    Safari zoomt automatisch hinein, sobald ein fokussiertes Eingabefeld
    kleiner als 16px ist. Nur dort hochsetzen, Desktop bleibt unverändert. */
@@ -415,7 +509,8 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
   body { background: #fff !important; }
   .header, .layout, .status-bar, .correction-progress,
   .export-bar, #validation-out, .syn-popover, .syl-legend,
-  .humor-tag, .inline-edit-wrap, .modal-overlay, .variant-bar { display: none !important; }
+  .humor-tag, .inline-edit-wrap, .modal-overlay, .variant-bar,
+  .quiz-card, #confetti-canvas { display: none !important; }
   .output-area { margin-top: 0 !important; }
   .app { max-width: 100%; padding: 0; }
   .story-wrap {
@@ -472,6 +567,7 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
 
       <div class="hint-card">
         <div id="hint-humor"><span class="hint-key">Textart:</span> <span class="hint-val" id="hint-humor-val"></span></div>
+        <div id="hint-quiz" style="display:none"><span class="hint-key">Lesefrage:</span> <span class="hint-val">🧠 an</span></div>
         <div id="hint-apikey"><span class="hint-warn">⚠ API-Key nicht gesetzt</span></div>
         <button class="hint-link" id="hint-settings-link">Einstellungen →</button>
       </div>
@@ -496,6 +592,15 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
         <div class="big">📚</div>
         <p>Laute auswählen, dann auf „Text erstellen" klicken.</p>
       </div>
+    </div>
+    <div class="quiz-card" id="quiz-card" hidden>
+      <div class="quiz-head">
+        <span class="quiz-badge">🧠 Lesefrage</span>
+        <button class="quiz-new" id="quiz-new">↻ Neue Frage</button>
+      </div>
+      <div class="quiz-question" id="quiz-question"></div>
+      <div class="quiz-options" id="quiz-options"></div>
+      <div class="quiz-feedback" id="quiz-feedback"></div>
     </div>
     <div class="export-bar" id="export-bar">
       <button class="btn-export btn-print" id="btn-print" onclick="printStory()">🖨️ Drucken</button>
@@ -542,6 +647,14 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
       </span>
     </label>
 
+    <label class="schema-box" for="quiz-toggle">
+      <input type="checkbox" id="quiz-toggle">
+      <span>
+        <span class="schema-title">🧠 Lesefrage am Ende</span>
+        <span class="schema-steps">Nach dem Text kommt eine Verständnisfrage – die Antwort wird per Farbklecks oder Tier angetippt.</span>
+      </span>
+    </label>
+
     <div class="modal-label">Varianten</div>
     <div class="variant-row" id="variant-row">
       <button class="variant-btn active" data-n="1">Aus</button>
@@ -553,6 +666,8 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
     <button class="btn-modal-ok" id="settings-apply">Übernehmen</button>
   </div>
 </div>
+
+<canvas id="confetti-canvas"></canvas>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.2/html2pdf.bundle.min.js"></script>
 
@@ -657,6 +772,7 @@ let activeVariant  = 0;
 let currentErrors  = [];
 let attemptCount   = 0;
 const MAX_ATTEMPTS = 5;
+let quizEnabled    = false;  // Lesefrage am Ende (Einstellungen)
 
 /* ══════════════════════════════════════════
    BUILD UI
@@ -1569,6 +1685,7 @@ function setActiveVariant(i) {
   showValidation(errors);
   renderVariantBar();
   setStatus(`Variante ${i+1} von ${storyVariants.length} übernommen.`, "info");
+  buildQuiz();
 }
 
 /* Hält die aktive Variante mit Korrekturen und manuellen Änderungen in Sync,
@@ -1597,6 +1714,7 @@ async function generate(prevText = null, prevErrors = null) {
   const useSchema   = document.getElementById("story-schema").checked;
 
   setLoading(true);
+  hideQuiz();
   attemptCount++;
   document.getElementById("validation-out").innerHTML = "";
   updateProgress(attemptCount, MAX_ATTEMPTS, "running");
@@ -1629,6 +1747,7 @@ ${useSchema ? `\nZUSÄTZLICHES GERÜST${humorType.prompt ? " (neben dem Witzmech
 1. WUNSCH/PROBLEM: Die Hauptfigur will etwas oder hat gleich zu Anfang ein Problem.
 2. HINDERNIS: Ein Versuch klappt nicht, oder es gibt ein Hindernis.
 3. LÖSUNG/POINTE: Die Auflösung am Ende ist zugleich die Pointe${humorType.prompt ? " des Witzmechanismus" : ""}.` : ""}
+${quizEnabled ? `\nLESEFRAGE: Nach dem Text folgt eine Verständnisfrage, die man mit einer FARBE oder einem TIER beantwortet. Baue deshalb mindestens ein eindeutiges, für die Handlung wichtiges Detail ein: eine Figur ist ein bestimmtes Tier, oder etwas hat eine klare Farbe.` : ""}
 
 AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
     prompt = prompt.replace(/\n{3,}/g, "\n\n");   // Leerzeilen aus leeren Bausteinen entfernen
@@ -1667,6 +1786,7 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
         ? `✓ Bester von ${storyVariants.length} Texten gewählt und validiert!`
         : "✓ Text generiert und validiert!", "ok");
       updateProgress(attemptCount, MAX_ATTEMPTS, "done");
+      buildQuiz();
     } else if (attemptCount < MAX_ATTEMPTS) {
       setStatus(`⚠ ${errors.length} Fehler – starte gezielte Korrektur …`, "warn");
       setTimeout(() => generate(text, errors), 700);
@@ -1674,6 +1794,7 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
     } else {
       setStatus(`${errors.length} Fehler nach ${MAX_ATTEMPTS} Versuchen. Bitte manuell per Synonymwerkzeug korrigieren.`, "err");
       updateProgress(attemptCount, MAX_ATTEMPTS, "failed");
+      buildQuiz();
     }
   } catch(err) {
     setStatus("Fehler: " + err.message, "err");
@@ -1686,6 +1807,362 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
 function getExampleForbidden() {
   const all = ["sch","g","k","z","ö","ü","au","eu","ng","ck","j","v","x","y","qu","sp","st"];
   return all.filter(s => !selected.has(s)).slice(0,6).join(", ") || "–";
+}
+
+/* ══════════════════════════════════════════
+   LESEFRAGE (Leseverständnis)
+   Nach dem Text folgt eine Frage, die per Farbklecks oder Tier
+   beantwortet wird – das Kind muss für die Antwort nichts schreiben.
+══════════════════════════════════════════ */
+const QUIZ_COLORS = {
+  rot:"#f2433a", blau:"#2f80ed", gelb:"#ffd43b", grün:"#3cc46a", lila:"#9b5de5", rosa:"#ff8fc8",
+  orange:"#ff8a1f", braun:"#9b5c2e", schwarz:"#2b2a33", weiß:"#ffffff", grau:"#a3a8b0"
+};
+const QUIZ_ANIMALS = {
+  hund:"🐶", katze:"🐱", maus:"🐭", hase:"🐰", fuchs:"🦊", bär:"🐻", frosch:"🐸", schwein:"🐷",
+  kuh:"🐮", löwe:"🦁", affe:"🐵", huhn:"🐔", ente:"🦆", eule:"🦉", igel:"🦔", fisch:"🐟",
+  pferd:"🐴", schaf:"🐑", schnecke:"🐌", biene:"🐝", wal:"🐳", elefant:"🐘", pinguin:"🐧",
+  tiger:"🐯", drache:"🐲", krokodil:"🐊", schildkröte:"🐢", krake:"🐙", raupe:"🐛", ziege:"🐐",
+  wolf:"🐺", panda:"🐼", giraffe:"🦒", papagei:"🦜", dino:"🦕", robbe:"🦭", hai:"🦈",
+  käfer:"🐞", vogel:"🐦", zebra:"🦓", einhorn:"🦄", lama:"🦙"
+};
+const QUIZ_ALIASES = {
+  weiss:"weiß", gruen:"grün", pink:"rosa", violett:"lila", baer:"bär", loewe:"löwe",
+  kaninchen:"hase", dinosaurier:"dino", oktopus:"krake", tintenfisch:"krake",
+  marienkäfer:"käfer", hahn:"huhn", henne:"huhn", kater:"katze", welpe:"hund", pony:"pferd"
+};
+const QUIZ_ANIMAL_BG = ["#ffe3a3","#c9f0d6","#d6e6ff","#ffd6e8","#e6dcff","#ffdcc4"];
+const QUIZ_PRAISE = ["Super gelesen! 🎉", "Juhu, richtig! 🥳", "Genau! Du bist ein Leseprofi! ⭐", "Volltreffer! 🎯"];
+const QUIZ_NUDGE  = ["Hoppla – fast! Lies nochmal nach. 🔍", "Nicht ganz! Schau nochmal in den Text. 👀", "Knapp daneben – du schaffst das! 💪"];
+let quizToken = 0;     // verwirft Antworten zu einem inzwischen veralteten Text
+let quizState = null;  // { answer, solved }
+
+function quizKey(typ, word) {
+  let k = String(word || "").trim().toLowerCase();
+  k = QUIZ_ALIASES[k] || k;
+  const map = typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS;
+  return map[k] ? k : null;
+}
+
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; }
+  return a;
+}
+
+async function fetchQuiz(apiKey, storyText) {
+  const soundList = [...selected].sort().join(", ");
+  const prompt = `Du bist Grundschullehrer:in. Stelle zu diesem Lesetext für Erstleser GENAU EINE Verständnisfrage.
+
+Die Antwort ist entweder eine FARBE oder ein TIER und muss sich eindeutig aus dem Text ergeben – man soll sie nur wissen können, wenn man den Text gelesen hat.
+Mögliche Farben: ${Object.keys(QUIZ_COLORS).join(", ")}
+Mögliche Tiere: ${Object.keys(QUIZ_ANIMALS).join(", ")}
+Wähle den Typ, der zum Text passt. Die Antwort muss exakt eines dieser Wörter sein.
+
+DIE FRAGE:
+- ein kurzer Satz, höchstens 8 Wörter, mit Fragezeichen
+- möglichst nur mit diesen Lauten: ${soundList} (Großbuchstaben und Doppelkonsonanten ok)
+- nennt die Antwort NICHT selbst
+
+ABLENKER: 3 weitere falsche Antworten desselben Typs aus der Liste. Gut sind Ablenker, die im Text auch vorkommen, aber nicht die Antwort sind.
+
+Text:
+${storyText}
+
+Antworte NUR mit JSON: {"typ":"farbe" oder "tier","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
+
+  const q = JSON.parse(await callOpenAI(apiKey, {
+    model:"gpt-4o", max_tokens:200, temperature:0.5,
+    messages:[{ role:"user", content: prompt }],
+    response_format:{ type:"json_object" }
+  }));
+
+  const typ = q.typ === "farbe" || q.typ === "tier" ? q.typ : null;
+  const answer = typ && quizKey(typ, q.antwort);
+  if (!answer || typeof q.frage !== "string" || !q.frage.trim()) {
+    throw new Error("Zu diesem Text fiel mir keine Farb- oder Tierfrage ein.");
+  }
+
+  const options = [answer];
+  for (const d of Array.isArray(q.ablenker) ? q.ablenker : []) {
+    const k = quizKey(typ, d);
+    if (k && !options.includes(k) && options.length < 4) options.push(k);
+  }
+  const pool = shuffle(Object.keys(typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS));
+  for (const k of pool) { if (options.length >= 4) break; if (!options.includes(k)) options.push(k); }
+
+  /* Die Frage soll das Kind selbst lesen können – enthält sie nicht eingeführte
+     Laute, einmal umformulieren lassen. Klappt das nicht, bleibt die Frage und
+     die Problemwörter werden dezent markiert (Lehrkraft liest vor). */
+  let question = stripStrayHyphens(q.frage.trim());
+  let errors = validateText(question);
+  if (errors.length) {
+    try {
+      const r = JSON.parse(await callOpenAI(apiKey, {
+        model:"gpt-4o", max_tokens:100, temperature:0.3,
+        messages:[{ role:"user", content:
+`Formuliere diese Frage für Erstleser um: "${question}"
+Die Antwort (${answer}) muss gleich bleiben und darf nicht in der Frage stehen.
+Nutze NUR diese Laute: ${soundList} (Großbuchstaben und Doppelkonsonanten ok).
+Diese Wörter gehen NICHT: ${errors.map(e => e.word).join(", ")}
+Höchstens 8 Wörter. Antworte NUR mit JSON: {"frage":"..."}` }],
+        response_format:{ type:"json_object" }
+      }));
+      if (typeof r.frage === "string" && r.frage.trim()) {
+        const alt = stripStrayHyphens(r.frage.trim());
+        const altErrors = validateText(alt);
+        if (altErrors.length < errors.length) { question = alt; errors = altErrors; }
+      }
+    } catch { /* erste Fassung behalten */ }
+  }
+
+  return { typ, question, answer, options: shuffle(options), errors };
+}
+
+function hideQuiz() {
+  quizToken++;
+  quizState = null;
+  document.getElementById("quiz-card").hidden = true;
+}
+
+async function buildQuiz() {
+  if (!quizEnabled || !currentRawText) { hideQuiz(); return; }
+  const apiKey = document.getElementById("api-key").value.trim();
+  if (!apiKey) return;
+
+  const token = ++quizToken;
+  quizState = null;
+  const card = document.getElementById("quiz-card");
+  const newBtn = document.getElementById("quiz-new");
+  document.getElementById("quiz-question").innerHTML = "";
+  document.getElementById("quiz-options").className = "quiz-options";
+  document.getElementById("quiz-options").innerHTML =
+    '<div class="quiz-loading">Ich denke mir eine Frage aus<span>.</span><span>.</span><span>.</span></div>';
+  setQuizFeedback("", "");
+  newBtn.disabled = true;
+  card.hidden = false;
+
+  try {
+    const quiz = await fetchQuiz(apiKey, currentRawText);
+    if (token !== quizToken) return;
+    renderQuiz(quiz);
+  } catch (err) {
+    if (token !== quizToken) return;
+    const box = document.getElementById("quiz-options");
+    box.innerHTML = "";
+    const msg = document.createElement("div");
+    msg.className = "quiz-error";
+    msg.textContent = err.message;               // API-Antwort: als Text, nie als HTML
+    box.appendChild(msg);
+  } finally {
+    if (token === quizToken) newBtn.disabled = false;
+  }
+}
+
+function renderQuiz(quiz) {
+  quizState = { answer: quiz.answer, solved: false };
+
+  const qEl = document.getElementById("quiz-question");
+  qEl.innerHTML = "";
+  appendSyllableText(qEl, quiz.question, quiz.errors);
+
+  const box = document.getElementById("quiz-options");
+  box.innerHTML = "";
+  quiz.options.forEach((key, i) => {
+    const btn = document.createElement("button");
+    btn.className = "qopt";
+    btn.style.setProperty("--d", (i * -0.45) + "s");
+    btn.setAttribute("aria-label", key.charAt(0).toUpperCase() + key.slice(1));
+    btn.title = btn.getAttribute("aria-label");
+
+    const bubble = document.createElement("span");
+    bubble.className = "qopt-bubble";
+    const idle = document.createElement("span");
+    idle.className = "qopt-idle";
+    const body = document.createElement("span");
+    if (quiz.typ === "farbe") {
+      body.className = "qopt-body";
+      body.innerHTML = blobSVG(QUIZ_COLORS[key], i + 1);
+    } else {
+      body.className = "qopt-body animal";
+      body.style.setProperty("--bg", QUIZ_ANIMAL_BG[i % QUIZ_ANIMAL_BG.length]);
+      body.textContent = QUIZ_ANIMALS[key];
+    }
+    idle.appendChild(body);
+    btn.append(bubble, idle);
+
+    // Quetschen solange gedrückt, beim Loslassen nachfedern
+    btn.addEventListener("pointerdown", () => { btn.classList.remove("boing"); btn.classList.add("pressed"); });
+    const release = () => {
+      if (!btn.classList.contains("pressed")) return;
+      btn.classList.remove("pressed");
+      void btn.offsetWidth;                      // Animation neu starten
+      btn.classList.add("boing");
+    };
+    btn.addEventListener("pointerup", release);
+    btn.addEventListener("pointerleave", release);
+    btn.addEventListener("pointercancel", release);
+    btn.addEventListener("click", () => answerQuiz(btn, key));
+    box.appendChild(btn);
+  });
+}
+
+function answerQuiz(btn, key) {
+  if (!quizState || quizState.solved || btn.classList.contains("is-wrong")) return;
+  const bubble = btn.querySelector(".qopt-bubble");
+  if (key === quizState.answer) {
+    quizState.solved = true;
+    btn.classList.add("is-right");
+    bubble.textContent = "Ja, ich! 😄";
+    document.getElementById("quiz-options").classList.add("quiz-done");
+    const r = btn.getBoundingClientRect();
+    launchConfetti(r.left + r.width / 2, r.top + r.height / 2);
+    setQuizFeedback(pick(QUIZ_PRAISE), "ok");
+  } else {
+    btn.classList.add("is-wrong");
+    btn.setAttribute("aria-disabled", "true");
+    bubble.textContent = "Ich nicht! 🙈";
+    setQuizFeedback(pick(QUIZ_NUDGE), "wrong");
+  }
+}
+
+function setQuizFeedback(text, type) {
+  const el = document.getElementById("quiz-feedback");
+  el.className = "quiz-feedback";
+  void el.offsetWidth;                           // Pop-Animation bei jedem Versuch neu
+  el.textContent = text;
+  if (type) el.classList.add(type);
+}
+
+/* Silbenfärbung für die Frage – wie im Lesetext, aber ohne Bearbeitung */
+function appendSyllableText(parent, text, errors) {
+  const bad = new Set((errors || []).map(e => e.word));
+  const parts = text.match(/[a-zA-ZäöüÄÖÜß]+|[^a-zA-ZäöüÄÖÜß]+/g) || [];
+  for (const part of parts) {
+    if (/[a-zA-ZäöüÄÖÜß]/.test(part)) {
+      const w = document.createElement("span");
+      if (bad.has(part.toLowerCase().replace(/ß/g, "ss"))) {
+        w.className = "quiz-bad";
+        w.title = "Enthält nicht eingeführte Laute – ggf. vorlesen";
+      }
+      syllabify(part).forEach((syl, si) => {
+        const sp = document.createElement("span");
+        sp.className = si % 2 === 0 ? "syl-a" : "syl-b";
+        sp.textContent = syl;
+        w.appendChild(sp);
+      });
+      parent.appendChild(w);
+    } else {
+      const sp = document.createElement("span");
+      sp.className = "punct"; sp.textContent = part;
+      parent.appendChild(sp);
+    }
+  }
+}
+
+/* ── Farbklecks-Monster ── */
+function seededRandom(seed) {
+  return () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
+}
+
+// Weiche, leicht wabbelige Kontur: Punkte im Kreis, per Catmull-Rom geglättet
+function blobPath(seed) {
+  const rnd = seededRandom(seed * 7919 + 13);
+  const n = 9, pts = [];
+  for (let i = 0; i < n; i++) {
+    const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+    const r = 40 + rnd() * 10;
+    pts.push([60 + Math.cos(a) * r * 1.05, 62 + Math.sin(a) * r]);
+  }
+  let d = `M${pts[0][0].toFixed(1)} ${pts[0][1].toFixed(1)}`;
+  for (let i = 0; i < n; i++) {
+    const p0 = pts[(i - 1 + n) % n], p1 = pts[i], p2 = pts[(i + 1) % n], p3 = pts[(i + 2) % n];
+    const c1 = [p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6];
+    const c2 = [p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6];
+    d += ` C${c1[0].toFixed(1)} ${c1[1].toFixed(1)} ${c2[0].toFixed(1)} ${c2[1].toFixed(1)} ${p2[0].toFixed(1)} ${p2[1].toFixed(1)}`;
+  }
+  return d + "Z";
+}
+
+function isDarkColor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 90;
+}
+
+function blobSVG(fill, seed) {
+  const ink = isDarkColor(fill) ? "#fff" : "#2a2230";
+  const edge = "rgba(0,0,0,.2)";
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <ellipse cx="44" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <ellipse cx="76" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <path d="${blobPath(seed)}" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <ellipse cx="38" cy="34" rx="10" ry="5.5" fill="#fff" opacity=".55" transform="rotate(-30 38 34)"/>
+    <g class="eye"><circle cx="45" cy="54" r="13" fill="#fff" stroke="#2a2230" stroke-width="2.5"/><circle class="pupil" cx="45" cy="54" r="6" fill="#1d1d24"/></g>
+    <g class="eye"><circle cx="76" cy="52" r="11" fill="#fff" stroke="#2a2230" stroke-width="2.5"/><circle class="pupil" cx="76" cy="52" r="5" fill="#1d1d24"/></g>
+    <path class="eye-happy" d="M35 56 Q45 44 55 56 M67 54 Q76 43 85 54" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
+    <path class="brows" d="M34 40 L52 34 M86 38 L69 33" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
+    <ellipse cx="34" cy="72" rx="7" ry="4" fill="#ff6f91" opacity=".45"/>
+    <ellipse cx="88" cy="70" rx="7" ry="4" fill="#ff6f91" opacity=".45"/>
+    <path class="mouth-normal" d="M50 74 Q61 85 72 74" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
+    <path class="mouth-happy" d="M45 70 Q61 96 77 70 Z" fill="#5a1a2a" stroke="${ink}" stroke-width="3" stroke-linejoin="round"/>
+    <path class="mouth-sad" d="M48 82 Q54 76 60 82 Q66 88 72 82" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
+    <path class="sweat" d="M95 30 Q101 40 95 44 Q89 40 95 30 Z" fill="#8fd3ff" stroke="#3b8fd0" stroke-width="2"/>
+  </svg>`;
+}
+
+/* Augen schauen dem Finger / der Maus hinterher */
+let eyeRaf = 0, eyeX = 0, eyeY = 0;
+document.addEventListener("pointermove", e => {
+  eyeX = e.clientX; eyeY = e.clientY;
+  if (eyeRaf || document.getElementById("quiz-card").hidden) return;
+  eyeRaf = requestAnimationFrame(() => {
+    eyeRaf = 0;
+    document.querySelectorAll("#quiz-options .eye").forEach(eye => {
+      const r = eye.getBoundingClientRect();
+      const dx = eyeX - (r.left + r.width / 2), dy = eyeY - (r.top + r.height / 2);
+      const dist = Math.hypot(dx, dy) || 1, m = Math.min(5, dist / 25);
+      eye.querySelector(".pupil").setAttribute("transform", `translate(${(dx / dist * m).toFixed(1)} ${(dy / dist * m).toFixed(1)})`);
+    });
+  });
+});
+
+/* ── Konfetti ── */
+let confetti = [], confettiRaf = 0;
+
+function launchConfetti(x, y) {
+  const colors = ["#f2433a","#ffd43b","#3cc46a","#2f80ed","#9b5de5","#ff8fc8","#ff8a1f"];
+  for (let i = 0; i < 170; i++) {
+    const a = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.1;
+    const v = 7 + Math.random() * 11;
+    confetti.push({
+      x, y, vx: Math.cos(a) * v, vy: Math.sin(a) * v,
+      s: 6 + Math.random() * 7, rot: Math.random() * 6.28, vr: (Math.random() - 0.5) * 0.4,
+      c: pick(colors), round: Math.random() < 0.3
+    });
+  }
+  if (!confettiRaf) confettiRaf = requestAnimationFrame(drawConfetti);
+}
+
+function drawConfetti() {
+  const c = document.getElementById("confetti-canvas"), ctx = c.getContext("2d");
+  const dpr = window.devicePixelRatio || 1, w = window.innerWidth, h = window.innerHeight;
+  if (c.width !== w * dpr || c.height !== h * dpr) { c.width = w * dpr; c.height = h * dpr; }
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, w, h);
+  confetti = confetti.filter(p => p.y < h + 30);
+  for (const p of confetti) {
+    p.vy += 0.32; p.vx *= 0.985; p.x += p.vx; p.y += p.vy; p.rot += p.vr;
+    ctx.save();
+    ctx.translate(p.x, p.y); ctx.rotate(p.rot);
+    ctx.fillStyle = p.c;
+    if (p.round) { ctx.beginPath(); ctx.arc(0, 0, p.s / 2.4, 0, 6.28); ctx.fill(); }
+    else { ctx.scale(1, Math.cos(p.rot * 2)); ctx.fillRect(-p.s / 2, -p.s / 4, p.s, p.s / 2); }
+    ctx.restore();
+  }
+  confettiRaf = confetti.length ? requestAnimationFrame(drawConfetti) : 0;
+  if (!confettiRaf) ctx.clearRect(0, 0, w, h);
 }
 
 /* ══════════════════════════════════════════
@@ -1827,6 +2304,7 @@ function updateHintCard() {
   const show = !!(h && h.prompt);
   document.getElementById("hint-humor").style.display = show ? "block" : "none";
   document.getElementById("hint-humor-val").textContent = show ? h.icon + " " + h.label : "";
+  document.getElementById("hint-quiz").style.display = quizEnabled ? "block" : "none";
   updateApiKeyState();
 }
 
@@ -1846,6 +2324,14 @@ document.querySelectorAll("#variant-row .variant-btn").forEach(btn => {
     btn.classList.add("active");
   });
 });
+
+document.getElementById("quiz-toggle").addEventListener("change", e => {
+  quizEnabled = e.target.checked;
+  // Nachträglich eingeschaltet: zum vorhandenen Text direkt eine Frage holen
+  if (!quizEnabled) hideQuiz();
+  else if (currentRawText && !loading) buildQuiz();
+});
+document.getElementById("quiz-new").addEventListener("click", buildQuiz);
 
 document.getElementById("btn-settings").addEventListener("click", openSettings);
 document.getElementById("hint-settings-link").addEventListener("click", openSettings);
