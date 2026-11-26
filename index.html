@@ -112,6 +112,13 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
 }
 .topic-input:focus { border-color: #2d9a65; }
 
+/* ═══ Namen ═══ */
+.name-chips { display: flex; flex-wrap: wrap; gap: 5px; max-height: 156px; overflow-y: auto; margin-bottom: 10px; }
+.chip.name-chip { font-size: 13px; padding: 3px 10px; min-width: 0; }
+.chip.name-warn { border-style: dashed; color: #c05050; }
+.name-empty, .name-hint { font-size: 11px; color: #b0aba4; line-height: 1.5; }
+.name-hint { margin-top: 6px; }
+
 /* ═══ Hint card ═══ */
 .hint-card {
   padding: 11px 14px; border-radius: 13px; background: #f7f5f2; border: 1px solid #e8e4dc;
@@ -511,7 +518,7 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
    Safari zoomt automatisch hinein, sobald ein fokussiertes Eingabefeld
    kleiner als 16px ist. Nur dort hochsetzen, Desktop bleibt unverändert. */
 @media (pointer: coarse) {
-  .topic-input, .api-bar input, .syn-manual-input { font-size: 16px; }
+  #custom-name, .topic-input, .api-bar input, .syn-manual-input { font-size: 16px; }
 }
 
 /* ═══ Scrollbars ═══ */
@@ -578,6 +585,13 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
       <div class="card compact">
         <div class="card-title">Eigenes Thema</div>
         <input type="text" class="topic-input" id="custom-topic" placeholder="z. B. Dinosaurier, Fußball …" autocomplete="off">
+      </div>
+
+      <div class="card compact">
+        <div class="card-title">Namen</div>
+        <div class="name-chips" id="name-chips"></div>
+        <input type="text" class="topic-input" id="custom-name" placeholder="Eigener Name + Enter" autocomplete="off">
+        <div class="name-hint" id="name-hint"></div>
       </div>
 
       <div class="hint-card">
@@ -783,16 +797,17 @@ const GROUPS = [
   { label:"Vokale",          sounds:["a","e","i","o","u"] },
   { label:"Umlaute",         sounds:["ä","ö","ü"] },
   { label:"Diphthonge",      sounds:["ei","ie","au","eu","äu","ai"] },
-  { label:"Konsonanten",     sounds:["b","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","z"] },
-  { label:"Lautverbindungen",sounds:["ch","sch","st","sp","ng","ck","tz","pf","nk","ss","qu"] }
+  { label:"Konsonanten",     sounds:["b","d","f","g","h","j","k","l","m","n","p","r","s","ß","t","v","w","z"] },
+  // „ss“ braucht keinen eigenen Chip: Doppelkonsonanten sind erlaubt, sobald der Einzellaut bekannt ist
+  { label:"Lautverbindungen",sounds:["ch","sch","st","sp","ng","ck","tz","pf","nk","qu"] }
 ];
 // Einführungsreihenfolge der Laute wie in der Silbenfibel „ABC der Tiere 1“
 // (Mildenberger) – passend zur Mildenberger-Silbenfärbung. Quelle: Inhaltsverzeichnis
-// des Schreiblehrgangs, der der Fibelreihenfolge folgt. ß entspricht hier „ss“;
-// y, c, x, chs (ganz am Ende der Fibel) gibt es in der Lautauswahl nicht.
+// des Schreiblehrgangs, der der Fibelreihenfolge folgt. y, c, x, chs (ganz am
+// Ende der Fibel) gibt es in der Lautauswahl nicht.
 const LEARN_ORDER = [
   "u","i","m","o","a","e","l","t","r","s","w","d","n","sch","ei","k","ck","b","f",
-  "au","g","ie","ö","p","pf","h","ss","ch","ä","st","sp","z","tz","ai","nk","ng",
+  "au","g","ie","ö","p","pf","h","ß","ch","ä","st","sp","z","tz","ai","nk","ng",
   "ü","j","eu","v","äu","qu"
 ];
 const DEFAULT = new Set(["a","e","i","o","u","l","m","n","p","t","s","w","r","d","h","f","b","ei","ie","ch"]);
@@ -868,7 +883,69 @@ function updateSelectedDisplay() {
   const all = [...selected].sort();
   el.textContent = all.length ? all.join("  ·  ") : "Keine Laute ausgewählt";
   updateLearnSlider();
+  renderNameCard();
 }
+
+/* ── Namen für die Figuren ──
+   Gezeigt werden nur Namen, die mit den bekannten Lauten lesbar sind; die Liste
+   wächst also mit dem Lernstand. Bis zu 3 Namen wählbar, eigene per Eingabe. */
+const NAME_POOL = [
+  "Mo","Mia","Mio","Ole","Ida","Emil","Lea","Leo","Tim","Tom","Ina","Ali","Ela","Nele","Lina",
+  "Lola","Lotta","Malte","Mila","Nina","Nils","Omar","Paul","Pia","Rosa","Rita","Sami","Sina",
+  "Timo","Tilo","Wim","Wanda","Anton","Amir","Elif","Emma","Finn","Fiete","Hanna","Hugo","Jana",
+  "Jonas","Kim","Lars","Luis","Mats","Noah","Olaf","Rudi","Susi","Toni","Tara","Lia","Ben","Bodo",
+  "Bea","Dana","Ede","Fritz","Greta","Gina","Hans","Karl","Kai","Lena","Lisa","Lukas","Mara",
+  "Marie","Milan","Nora","Paula","Ronja","Selin","Sofia","Tarek","Deniz","Emre","Mehmet","Nuri",
+  "Ömer","Jakob","Jule","Juri","Merle","Ilias","Mina","Esra","Arda","Elias","Emilia","Oma","Opa",
+  "Udo","Uwe","Rolf","Wilma","Alma","Edda","Inga","Ute","Pit","Lotte","Tilda","Romi","Nilu"
+];
+let chosenNames = [];
+
+function readableNames() {
+  return [...new Set(NAME_POOL)].filter(n => isWordValid(n).ok)
+    .sort((a, b) => a.length - b.length || a.localeCompare(b, "de"));
+}
+
+function toggleName(n) {
+  if (chosenNames.includes(n)) chosenNames = chosenNames.filter(x => x !== n);
+  else { if (chosenNames.length >= 3) chosenNames.shift(); chosenNames.push(n); }
+  renderNameCard();
+}
+
+function renderNameCard() {
+  const box = document.getElementById("name-chips");
+  if (!box) return;
+  box.innerHTML = "";
+  // Gewählte Namen bleiben sichtbar, auch wenn sie nicht (mehr) zu den Lauten passen
+  const names = [...new Set([...chosenNames, ...readableNames()])];
+  if (!names.length) {
+    const e = document.createElement("span");
+    e.className = "name-empty";
+    e.textContent = "Mit diesen Lauten passt noch kein Name aus der Liste – eigenen eingeben.";
+    box.appendChild(e);
+  }
+  for (const n of names) {
+    const v = isWordValid(n);
+    const btn = document.createElement("button");
+    btn.className = "chip name-chip" + (chosenNames.includes(n) ? " on" : "") + (v.ok ? "" : " name-warn");
+    btn.textContent = n;
+    btn.title = v.ok ? "Als Figur verwenden" : `Enthält Laut „${v.bad}“, der noch nicht eingeführt ist`;
+    btn.addEventListener("click", () => toggleName(n));
+    box.appendChild(btn);
+  }
+  document.getElementById("name-hint").textContent = chosenNames.length
+    ? `Figuren: ${chosenNames.join(", ")}`
+    : "Keine Auswahl: Die KI nimmt passende Namen aus dieser Liste.";
+}
+
+document.getElementById("custom-name").addEventListener("keydown", e => {
+  if (e.key !== "Enter") return;
+  const raw = e.target.value.trim();
+  if (!raw) return;
+  const n = raw.charAt(0).toUpperCase() + raw.slice(1);
+  if (!chosenNames.includes(n)) toggleName(n);
+  e.target.value = "";
+});
 
 function syncChips() {
   document.querySelectorAll("#sound-card .chip").forEach(c => c.classList.toggle("on", selected.has(c.dataset.sound)));
@@ -954,12 +1031,12 @@ function setLoading(state) {
    VALIDATION
 ══════════════════════════════════════════ */
 function getAllowedSounds() {
-  const singles = [...selected].filter(s => s.length===1 && !"aeiouäöü".includes(s));
+  const singles = [...selected].filter(s => s.length===1 && !"aeiouäöüß".includes(s));
   return [...new Set([...selected, ...singles.map(c=>c+c)])].sort((a,b)=>b.length-a.length);
 }
 
 function isWordValid(word) {
-  const norm = word.toLowerCase().replace(/ß/g,"ss");
+  const norm = word.toLowerCase();
   const allSounds = getAllowedSounds();
   let pos = 0;
   while (pos < norm.length) {
@@ -973,7 +1050,7 @@ function isWordValid(word) {
 }
 
 function validateText(text) {
-  const norm = text.toLowerCase().replace(/ß/g,"ss").replace(/[^a-zäöü\s]/g," ");
+  const norm = text.toLowerCase().replace(/[^a-zäöüß\s]/g," ");
   const words = norm.split(/\s+/).filter(w => w.length > 0);
   const allSounds = getAllowedSounds();
   const errors = [];
@@ -1865,6 +1942,7 @@ TEXTLÄNGE: HÖCHSTENS ${textLen} Wörter (gut: ${Math.round(textLen * 0.8)}–$
 Schreibe JEDES Wort normal am Stück, NIEMALS mit Bindestrich getrennt (also "abgehoben", nicht "ab-ge-ho-ben").
 
 ${humorType.prompt ? `\n${humorType.prompt}\n` : ""}
+${namesPrompt()}
 ${customTopic ? `\nTHEMA: Baue die Geschichte um folgendes Thema bzw. folgende Wörter herum: ${customTopic}. Das Thema hat Vorrang vor generischen Inhalten, muss aber weiterhin zu den erlaubten Lauten passen.` : ""}
 ${useSchema ? `\nZUSÄTZLICHES GERÜST${humorType.prompt ? " (neben dem Witzmechanismus einhalten)" : ""}:
 1. WUNSCH/PROBLEM: Die Hauptfigur will etwas oder hat gleich zu Anfang ein Problem.
@@ -1967,6 +2045,16 @@ ${text}` }]
     } catch { break; }   // Kürzen ist ein Extra – Fehler hier dürfen die Generierung nicht stoppen
   }
   return text;
+}
+
+function namesPrompt() {
+  if (chosenNames.length) {
+    return `\nFIGUREN: Die Hauptfiguren heißen ${chosenNames.join(", ")}. Verwende genau diese Namen. Weitere Figuren bekommen keinen Namen (z. B. „die Lehrerin“, „der Opa“).`;
+  }
+  const names = readableNames();
+  return names.length
+    ? `\nNAMEN: Wenn Figuren Namen bekommen, nimm nur Namen aus dieser Liste: ${shuffle(names).slice(0, 12).join(", ")}.`
+    : "";
 }
 
 function getExampleForbidden() {
@@ -2377,7 +2465,7 @@ function appendSyllableText(parent, text, errors) {
   for (const part of parts) {
     if (/[a-zA-ZäöüÄÖÜß]/.test(part)) {
       const w = document.createElement("span");
-      if (bad.has(part.toLowerCase().replace(/ß/g, "ss"))) {
+      if (bad.has(part.toLowerCase())) {
         w.className = "quiz-bad";
         w.title = "Enthält nicht eingeführte Laute – ggf. vorlesen";
       }
