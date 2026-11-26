@@ -118,6 +118,7 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
 .chip.name-warn { border-style: dashed; color: #c05050; }
 .name-empty, .name-hint { font-size: 11px; color: #b0aba4; line-height: 1.5; }
 .name-hint { margin-top: 6px; }
+.name-box { margin-bottom: 22px; }
 
 /* ═══ Hint card ═══ */
 .hint-card {
@@ -587,15 +588,9 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
         <input type="text" class="topic-input" id="custom-topic" placeholder="z. B. Dinosaurier, Fußball …" autocomplete="off">
       </div>
 
-      <div class="card compact">
-        <div class="card-title">Namen</div>
-        <div class="name-chips" id="name-chips"></div>
-        <input type="text" class="topic-input" id="custom-name" placeholder="Eigener Name + Enter" autocomplete="off">
-        <div class="name-hint" id="name-hint"></div>
-      </div>
-
       <div class="hint-card">
         <div id="hint-humor"><span class="hint-key">Textart:</span> <span class="hint-val" id="hint-humor-val"></span></div>
+        <div id="hint-names" style="display:none"><span class="hint-key">Figuren:</span> <span class="hint-val" id="hint-names-val"></span></div>
         <div id="hint-quiz" style="display:none"><span class="hint-key">Lesefrage:</span> <span class="hint-val">🧠 an</span></div>
         <div id="hint-apikey"><span class="hint-warn">⚠ API-Key nicht gesetzt</span></div>
         <button class="hint-link" id="hint-settings-link">Einstellungen →</button>
@@ -648,7 +643,7 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
     <div class="modal-head">
       <div>
         <h2>Einstellungen</h2>
-        <p>API-Key, Textart und Struktur</p>
+        <p>API-Key, Modell, Namen, Textart und Struktur</p>
       </div>
       <button class="modal-close" id="settings-close" title="Schließen">✕</button>
     </div>
@@ -675,6 +670,13 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
       <button class="variant-btn" data-model="gpt-4o">GPT-4o</button>
     </div>
     <div class="variant-note">Gilt für Texte, Korrekturen, Variantenauswahl und Lesefrage. GPT-5 schreibt und prüft am gründlichsten, ist aber langsamer und teurer. Ist ein Modell für deinen Key nicht freigeschaltet, wird automatisch GPT-4o genutzt.</div>
+
+    <div class="modal-label">Namen der Figuren</div>
+    <div class="name-box">
+      <div class="name-chips" id="name-chips"></div>
+      <input type="text" class="topic-input" id="custom-name" placeholder="Eigener Name + Enter" autocomplete="off">
+      <div class="name-hint" id="name-hint"></div>
+    </div>
 
     <div class="modal-label">Textart</div>
     <div class="humor-grid" id="humor-grid"></div>
@@ -933,6 +935,8 @@ function renderNameCard() {
     btn.addEventListener("click", () => toggleName(n));
     box.appendChild(btn);
   }
+  document.getElementById("hint-names").style.display = chosenNames.length ? "block" : "none";
+  document.getElementById("hint-names-val").textContent = chosenNames.join(", ");
   document.getElementById("name-hint").textContent = chosenNames.length
     ? `Figuren: ${chosenNames.join(", ")}`
     : "Keine Auswahl: Die KI nimmt passende Namen aus dieser Liste.";
