@@ -74,6 +74,12 @@ body {
 .chip.on { background: #eaf5ee; border-color: #38a86d; color: #1c6b41; }
 .chip.on:hover { background: #dff0e7; border-color: #2d9a65; }
 
+/* ═══ Lernstand-Slider ═══ */
+.lern-slider { margin-bottom: 18px; padding-bottom: 16px; border-bottom: 1px solid #f0ede8; }
+.ls-note { font-size: 11px; color: #b0aba4; margin-top: 4px; line-height: 1.5; }
+.ls-note .ls-custom { color: #d08020; font-weight: 700; }
+.chip.newest { box-shadow: 0 0 0 2px #e8a020; }
+
 /* ═══ Parameter sliders ═══ */
 .setting { margin-bottom: 14px; }
 .setting-label {
@@ -780,6 +786,15 @@ const GROUPS = [
   { label:"Konsonanten",     sounds:["b","d","f","g","h","j","k","l","m","n","p","r","s","t","v","w","z"] },
   { label:"Lautverbindungen",sounds:["ch","sch","st","sp","ng","ck","tz","pf","nk","ss","qu"] }
 ];
+// Einführungsreihenfolge der Laute wie in der Silbenfibel „ABC der Tiere 1“
+// (Mildenberger) – passend zur Mildenberger-Silbenfärbung. Quelle: Inhaltsverzeichnis
+// des Schreiblehrgangs, der der Fibelreihenfolge folgt. ß entspricht hier „ss“;
+// y, c, x, chs (ganz am Ende der Fibel) gibt es in der Lautauswahl nicht.
+const LEARN_ORDER = [
+  "u","i","m","o","a","e","l","t","r","s","w","d","n","sch","ei","k","ck","b","f",
+  "au","g","ie","ö","p","pf","h","ss","ch","ä","st","sp","z","tz","ai","nk","ng",
+  "ü","j","eu","v","äu","qu"
+];
 const DEFAULT = new Set(["a","e","i","o","u","l","m","n","p","t","s","w","r","d","h","f","b","ei","ie","ch"]);
 let selected = new Set(DEFAULT);
 
@@ -815,7 +830,17 @@ function buildHumorGrid() {
 
 function buildSoundCard() {
   const card = document.getElementById("sound-card");
-  card.innerHTML = '<div class="card-title">Bekannte Laute</div>';
+  card.innerHTML = `<div class="card-title">Bekannte Laute</div>
+    <div class="lern-slider">
+      <div class="setting-label">Lernstand <strong id="ls-val"></strong></div>
+      <input type="range" id="lernstand" min="0" max="${LEARN_ORDER.length}" step="1">
+      <div class="ls-note" id="ls-note"></div>
+    </div>`;
+  card.querySelector("#lernstand").addEventListener("input", e => {
+    selected = new Set(LEARN_ORDER.slice(0, parseInt(e.target.value, 10)));
+    syncChips();
+    updateSelectedDisplay();
+  });
   for (const g of GROUPS) {
     const lbl = document.createElement("div");
     lbl.className = "group-label"; lbl.textContent = g.label;
@@ -825,6 +850,8 @@ function buildSoundCard() {
       const btn = document.createElement("button");
       btn.className = "chip" + (selected.has(s) ? " on" : "");
       btn.textContent = s;
+      btn.dataset.sound = s;
+      btn.title = `Nr. ${LEARN_ORDER.indexOf(s) + 1} in der Fibel-Reihenfolge`;
       btn.addEventListener("click", () => {
         if (selected.has(s)) { selected.delete(s); btn.classList.remove("on"); }
         else { selected.add(s); btn.classList.add("on"); }
@@ -840,6 +867,42 @@ function updateSelectedDisplay() {
   const el = document.getElementById("selected-display");
   const all = [...selected].sort();
   el.textContent = all.length ? all.join("  ·  ") : "Keine Laute ausgewählt";
+  updateLearnSlider();
+}
+
+function syncChips() {
+  document.querySelectorAll("#sound-card .chip").forEach(c => c.classList.toggle("on", selected.has(c.dataset.sound)));
+}
+
+/* Slider zeigt den Lernstand, der am besten zur Auswahl passt (wenigste
+   Abweichungen). Von Hand ab- oder dazugewählte Laute werden als Ausnahme genannt. */
+function updateLearnSlider() {
+  const slider = document.getElementById("lernstand");
+  if (!slider) return;
+  let n = 0, best = Infinity;
+  for (let k = 0; k <= LEARN_ORDER.length; k++) {
+    const prefix = LEARN_ORDER.slice(0, k);
+    const cost = prefix.filter(x => !selected.has(x)).length + [...selected].filter(x => !prefix.includes(x)).length;
+    if (cost <= best) { best = cost; n = k; }
+  }
+  slider.value = n;
+  const missing = LEARN_ORDER.slice(0, n).filter(x => !selected.has(x));
+  const extra = [...selected].filter(x => LEARN_ORDER.indexOf(x) >= n);
+  document.getElementById("ls-val").textContent = n
+    ? `bis „${LEARN_ORDER[n - 1]}“ · ${n} von ${LEARN_ORDER.length}`
+    : "noch keine";
+  const note = document.getElementById("ls-note");
+  note.textContent = "Reihenfolge wie in der Silbenfibel „ABC der Tiere“ (Mildenberger)";
+  if (n < LEARN_ORDER.length) note.textContent += ` · als Nächstes: „${LEARN_ORDER[n]}“`;
+  if (missing.length || extra.length) {
+    const c = document.createElement("span");
+    c.className = "ls-custom";
+    c.textContent = (missing.length ? ` · ohne: ${missing.join(", ")}` : "") +
+                    (extra.length ? ` · zusätzlich: ${extra.join(", ")}` : "");
+    note.appendChild(c);
+  }
+  document.querySelectorAll("#sound-card .chip").forEach(c =>
+    c.classList.toggle("newest", n > 0 && c.dataset.sound === LEARN_ORDER[n - 1]));
 }
 
 document.getElementById("wordlen").addEventListener("input", e => document.getElementById("wl-val").textContent = e.target.value);
