@@ -671,7 +671,7 @@ input[type=range] { width: 100%; accent-color: #2d9a65; cursor: pointer; }
       <input type="checkbox" id="quiz-toggle">
       <span>
         <span class="schema-title">🧠 Lesefrage am Ende</span>
-        <span class="schema-steps">Nach dem Text kommt eine Verständnisfrage – die Antwort wird per Farbklecks oder Tier angetippt.</span>
+        <span class="schema-steps">Nach dem Text kommt eine Verständnisfrage – die Antwort wird per Farbklecks, Tier, Zahl oder Bild angetippt.</span>
       </span>
     </label>
 
@@ -1807,7 +1807,7 @@ ${useSchema ? `\nZUSÄTZLICHES GERÜST${humorType.prompt ? " (neben dem Witzmech
 1. WUNSCH/PROBLEM: Die Hauptfigur will etwas oder hat gleich zu Anfang ein Problem.
 2. HINDERNIS: Ein Versuch klappt nicht, oder es gibt ein Hindernis.
 3. LÖSUNG/POINTE: Die Auflösung am Ende ist zugleich die Pointe${humorType.prompt ? " des Witzmechanismus" : ""}.` : ""}
-${quizEnabled ? `\nLESEFRAGE: Nach dem Text folgt eine Verständnisfrage, die man mit einer FARBE oder einem TIER beantwortet. Baue deshalb mindestens ein eindeutiges, für die Handlung wichtiges Detail ein: eine Figur ist ein bestimmtes Tier, oder etwas hat eine klare Farbe.` : ""}
+${quizEnabled ? `\nLESEFRAGE: Nach dem Text folgt eine Verständnisfrage, die man mit einer FARBE, einem TIER, einer ANZAHL oder einem DING beantwortet. Baue deshalb ein bis zwei eindeutige, für die Handlung wichtige Details ein – z. B. eine Figur ist ein bestimmtes Tier, etwas hat eine klare Farbe, es gibt eine genannte Anzahl (drei Äpfel) oder ein wichtiger Gegenstand bzw. etwas zu essen.` : ""}
 
 AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
     prompt = prompt.replace(/\n{3,}/g, "\n\n");   // Leerzeilen aus leeren Bausteinen entfernen
@@ -1889,7 +1889,7 @@ async function enforceLength(apiKey, text, target, soundList, wordLen) {
         max_tokens: 600, temperature: 0.4,
         messages: [{ role:"user", content:
 `Kürze diesen Lesetext für Erstleser auf HÖCHSTENS ${target} Wörter (jetzt sind es ${n}).
-- Streiche Nebensächliches und fasse zusammen. Die Handlung bleibt verständlich, das Ende bzw. die Pointe bleibt erhalten.${quizEnabled ? "\n- Das wichtige Farb- oder Tierdetail bleibt drin." : ""}
+- Streiche Nebensächliches und fasse zusammen. Die Handlung bleibt verständlich, das Ende bzw. die Pointe bleibt erhalten.${quizEnabled ? "\n- Wichtige Details (Farbe, Tier, Anzahl, Gegenstand) bleiben drin." : ""}
 - Nimm möglichst nur Wörter, die schon im Text stehen. Neue Wörter nur mit diesen Lauten: ${soundList}. Kein Wort länger als ${wordLen} Buchstaben.
 - Zeilenumbrüche wie im Original, keine Bindestriche in Wörtern.
 Gib NUR den gekürzten Text zurück, ohne Kommentar.
@@ -1933,6 +1933,31 @@ const QUIZ_ALIASES = {
   kaninchen:"hase", dinosaurier:"dino", oktopus:"krake", tintenfisch:"krake",
   marienkäfer:"käfer", hahn:"huhn", henne:"huhn", kater:"katze", welpe:"hund", pony:"pferd"
 };
+Object.assign(QUIZ_ALIASES, { möhre:"karotte", mohrrübe:"karotte", fahrrad:"rad", kappe:"mütze" });
+// Zahlen 1–10, jede mit eigener Farbe für die Zahlen-Figuren
+const QUIZ_NUMBERS = {
+  "1":"#f2433a", "2":"#ff8a1f", "3":"#ffc61a", "4":"#3cc46a", "5":"#2f80ed",
+  "6":"#9b5de5", "7":"#ff7eb9", "8":"#1fb5ad", "9":"#b0703a", "10":"#e8508a"
+};
+const QUIZ_NUMBER_WORDS = {
+  eins:"1", ein:"1", eine:"1", zwei:"2", drei:"3", vier:"4", fünf:"5", fuenf:"5",
+  sechs:"6", sieben:"7", acht:"8", neun:"9", zehn:"10"
+};
+const QUIZ_THINGS = {
+  apfel:"🍎", banane:"🍌", birne:"🍐", kirsche:"🍒", erdbeere:"🍓", karotte:"🥕", kuchen:"🍰",
+  torte:"🎂", eis:"🍦", brot:"🍞", käse:"🧀", pizza:"🍕", keks:"🍪", bonbon:"🍬", pilz:"🍄",
+  ball:"⚽", hut:"🎩", mütze:"🧢", schuh:"👟", socke:"🧦", brille:"👓", krone:"👑", schirm:"☂️",
+  boot:"⛵", auto:"🚗", rad:"🚲", zug:"🚂", rakete:"🚀", buch:"📖", brief:"✉️", geschenk:"🎁",
+  ballon:"🎈", trommel:"🥁", glocke:"🔔", uhr:"⏰", lampe:"💡", schlüssel:"🔑", kiste:"📦",
+  tasse:"☕", bett:"🛏️", stuhl:"🪑", haus:"🏠", baum:"🌳", blume:"🌷", stern:"⭐", mond:"🌙", sonne:"☀️"
+};
+/* Alle Fragetypen an einer Stelle: was gefragt wird und welche Antworten es gibt */
+const QUIZ_TYPES = {
+  farbe:  { items: QUIZ_COLORS,  name: "eine FARBE",  list: "Farben", hint: "z. B. „Das Boot ist rot.“" },
+  tier:   { items: QUIZ_ANIMALS, name: "ein TIER",    list: "Tiere",  hint: "z. B. „Der Frosch ruft …“" },
+  anzahl: { items: QUIZ_NUMBERS, name: "eine ANZAHL", list: "Zahlen (als Ziffer)", hint: "z. B. „Ina hat drei Äpfel.“ → Antwort \"3\"" },
+  ding:   { items: QUIZ_THINGS,  name: "ein DING (Gegenstand oder Essen)", list: "Dinge", hint: "z. B. „Tom isst einen Apfel.“" }
+};
 const QUIZ_ANIMAL_BG = ["#ffe3a3","#c9f0d6","#d6e6ff","#ffd6e8","#e6dcff","#ffdcc4"];
 const QUIZ_PRAISE = ["Super gelesen! 🎉", "Juhu, richtig! 🥳", "Genau! Du bist ein Leseprofi! ⭐", "Volltreffer! 🎯"];
 const QUIZ_NUDGE  = ["Hoppla – fast! Lies nochmal nach. 🔍", "Nicht ganz! Schau nochmal in den Text. 👀", "Knapp daneben – du schaffst das! 💪"];
@@ -1952,10 +1977,22 @@ function parseQuizJSON(raw) {
 }
 
 function quizKey(typ, word) {
-  let k = String(word || "").trim().toLowerCase();
-  k = QUIZ_ALIASES[k] || k;
-  const map = typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS;
-  return map[k] ? k : null;
+  if (!QUIZ_TYPES[typ]) return null;
+  let k = String(word ?? "").trim().toLowerCase();
+  k = typ === "anzahl" ? (QUIZ_NUMBER_WORDS[k] || k) : (QUIZ_ALIASES[k] || k);
+  return QUIZ_TYPES[typ].items[k] ? k : null;
+}
+
+// Verrät die Frage die Antwort? Wortgenau inkl. Endungen (rot → rote), aber
+// nicht als Teilstring (rot in Brot). Bei Zahlen zählt auch das Zahlwort.
+function questionRevealsAnswer(question, typ, answer) {
+  const forms = [answer];
+  if (typ === "anzahl") {
+    const word = Object.keys(QUIZ_NUMBER_WORDS).find(w => QUIZ_NUMBER_WORDS[w] === answer && w !== "ein" && w !== "eine");
+    if (word) forms.push(word);
+  }
+  return question.toLowerCase().split(/[^a-zäöüß0-9]+/).some(w => forms.some(f =>
+    w === f || (w.startsWith(f) && (f.length >= 4 || /^(e|en|er|es|n|s)$/.test(w.slice(f.length))))));
 }
 
 function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
@@ -1985,14 +2022,14 @@ async function fetchQuiz(apiKey, storyText, asked, onStage) {
     if (check.ok) return quiz;
     rejected.push({ frage: quiz.question, antwort: quiz.answer, grund: check.reason });
   }
-  throw new Error("Zu diesem Text fand ich keine eindeutig beantwortbare Farb- oder Tierfrage. Probier „Neue Frage“ oder erstelle einen neuen Text.");
+  throw new Error("Zu diesem Text fand ich keine eindeutig beantwortbare Frage. Probier „Neue Frage“ oder erstelle einen neuen Text.");
 }
 
 /* Blinde Gegenprobe: Ein zweiter Aufruf kennt die gewünschte Antwort NICHT und
    muss die Frage allein aus dem Text lösen. Nur wenn er auf dieselbe Antwort
    kommt und die Frage eindeutig findet, wird sie gezeigt. */
 async function checkQuiz(apiKey, storyText, quiz) {
-  const map = quiz.typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS;
+  const map = QUIZ_TYPES[quiz.typ].items;
   const labels = quiz.options.map(k => k.charAt(0).toUpperCase() + k.slice(1));
   const prompt = `Du prüfst eine Leseverständnisfrage für Erstleser (Klasse 1).
 Beantworte sie AUSSCHLIESSLICH mit dem, was im Text ausdrücklich steht – kein Weltwissen, keine Vermutung, kein „wahrscheinlich“.
@@ -2004,7 +2041,7 @@ Frage: ${quiz.question}
 Antwortmöglichkeiten: ${labels.join(", ")}
 
 Prüfe streng:
-1. Welche Antwortmöglichkeit steht laut Text fest? Wird die Farbe bzw. das Tier im Text gar nicht genannt, ist die Antwort null.
+1. Welche Antwortmöglichkeit steht laut Text fest? Steht die Antwort im Text gar nicht (bei Anzahlen: muss man raten oder kann nicht sicher zählen), ist die Antwort null.
 2. Treffen mehrere Möglichkeiten zu? Dann ist die Frage nicht eindeutig.
 3. Ist klar, wer oder was gemeint ist, sodass ein Kind die Frage versteht?
 
@@ -2039,24 +2076,32 @@ async function draftQuiz(apiKey, storyText, asked, rejected) {
   const avoid = asked.length ? `
 SCHON GESTELLT – stelle eine ANDERE Frage zu einem ANDEREN Detail mit einer ANDEREN Antwort:
 ${asked.map(a => `- "${a.frage}" (Antwort: ${a.antwort})`).join("\n")}
-Nur wenn der Text wirklich kein anderes Farb- oder Tierdetail hat, darf die Antwort gleich bleiben – dann aber deutlich anders fragen.
+Nur wenn der Text wirklich kein anderes passendes Detail hat, darf die Antwort gleich bleiben – dann aber deutlich anders fragen.
 ` : "";
   const failed = rejected.length ? `
 VERWORFEN – diese Entwürfe waren nicht beantwortbar oder nicht eindeutig. Mach es besser:
 ${rejected.map(r => `- "${r.frage}" (Antwort: ${r.antwort}) → ${r.grund}`).join("\n")}
 ` : "";
+  // Damit es nicht immer „Welche Farbe …?“ wird: pro Frage einen Wunschtyp vorschlagen,
+  // bevorzugt einen, der zu diesem Text noch nicht dran war.
+  const unused = Object.keys(QUIZ_TYPES).filter(t => !asked.some(a => a.typ === t));
+  const wish = pick(unused.length ? unused : Object.keys(QUIZ_TYPES));
+  const typeList = Object.entries(QUIZ_TYPES)
+    .map(([id, t]) => `- "${id}" = ${t.name}, ${t.hint}. Mögliche ${t.list}: ${Object.keys(t.items).join(", ")}`)
+    .join("\n");
   const prompt = `Du bist Grundschullehrer:in. Stelle zu diesem Lesetext für Erstleser GENAU EINE Verständnisfrage.
 
-Die Antwort ist entweder eine FARBE oder ein TIER.
-Mögliche Farben: ${Object.keys(QUIZ_COLORS).join(", ")}
-Mögliche Tiere: ${Object.keys(QUIZ_ANIMALS).join(", ")}
-Die Antwort muss exakt eines dieser Wörter sein.
+Die Antwort ist eines von diesen Dingen (Typ in Anführungszeichen):
+${typeList}
+Die Antwort muss exakt eines der Wörter bzw. Zahlen aus der Liste ihres Typs sein.
+
+WUNSCH: Frage diesmal möglichst nach ${QUIZ_TYPES[wish].name} (Typ "${wish}"). Gibt der Text dafür nichts Eindeutiges her, nimm einen anderen Typ.
 
 GANZ WICHTIG – die Frage muss beantwortbar sein:
-- Die Antwort-Farbe bzw. das Antwort-Tier muss im Text AUSDRÜCKLICH genannt werden (z. B. „Das Boot ist rot.“, „Der Frosch ruft …“).
+- Die Antwort muss im Text AUSDRÜCKLICH stehen. Bei Anzahlen muss die Zahl genannt werden oder die Dinge müssen klar einzeln aufgezählt sein.
 - Frage NIEMALS nach etwas, das im Text nicht steht, und lass das Kind nichts raten oder erschließen.
 - Es darf nur genau eine der vier Möglichkeiten passen. Ablenker dürfen auf die Frage NICHT zutreffen.
-- Kommt im Text keine Farbe und kein Tier aus den Listen vor, antworte {"typ":"keine"}.
+- Passt zu keinem Typ etwas aus dem Text, antworte {"typ":"keine"}.
 
 DIE FRAGE:
 - ein kurzer Satz, höchstens 8 Wörter, mit Fragezeichen
@@ -2069,7 +2114,7 @@ ${avoid}${failed}
 Text:
 ${storyText}
 
-Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
+Antworte NUR mit JSON: {"typ":"farbe", "tier", "anzahl", "ding" oder "keine","frage":"...","antwort":"...","ablenker":["...","...","..."]}`;
 
   const q = parseQuizJSON(await callAI(apiKey, {
     max_tokens:200, temperature: asked.length || rejected.length ? 0.9 : 0.5,
@@ -2078,12 +2123,12 @@ Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","an
   }));
 
   if (q.typ === "keine") {
-    throw new QuizNoDetail("In diesem Text kommt keine Farbe und kein Tier vor, nach dem man fragen könnte. Erstelle einen neuen Text – bei eingeschalteter Lesefrage baut die KI so ein Detail gezielt ein.");
+    throw new QuizNoDetail("In diesem Text steht nichts, wonach man mit Farbe, Tier, Anzahl oder Ding eindeutig fragen könnte. Erstelle einen neuen Text – bei eingeschalteter Lesefrage baut die KI so ein Detail gezielt ein.");
   }
-  const typ = q.typ === "farbe" || q.typ === "tier" ? q.typ : null;
+  const typ = QUIZ_TYPES[q.typ] ? q.typ : null;
   const answer = typ && quizKey(typ, q.antwort);
   if (!answer || typeof q.frage !== "string" || !q.frage.trim()) {
-    throw new QuizReject("Antwort war kein Wort aus der Farb- bzw. Tierliste.");
+    throw new QuizReject("Antwort war kein Wort aus der Liste ihres Typs.");
   }
 
   const options = [answer];
@@ -2091,7 +2136,9 @@ Antworte NUR mit JSON: {"typ":"farbe" oder "tier" oder "keine","frage":"...","an
     const k = quizKey(typ, d);
     if (k && !options.includes(k) && options.length < 4) options.push(k);
   }
-  const pool = shuffle(Object.keys(typ === "farbe" ? QUIZ_COLORS : QUIZ_ANIMALS));
+  // Bei Zahlen sind nahe Nachbarn die besseren Ablenker (3 → 2, 4, 5 statt 9)
+  let pool = shuffle(Object.keys(QUIZ_TYPES[typ].items));
+  if (typ === "anzahl") pool.sort((a, b) => Math.abs(a - answer) - Math.abs(b - answer));
   for (const k of pool) { if (options.length >= 4) break; if (!options.includes(k)) options.push(k); }
 
   /* Die Frage soll das Kind selbst lesen können – enthält sie nicht eingeführte
@@ -2119,11 +2166,10 @@ Höchstens 8 Wörter. Antworte NUR mit JSON: {"frage":"..."}` }],
     } catch { /* erste Fassung behalten */ }
   }
 
-  // Wortanfang statt Teilstring – sonst würde „rot“ in „Brot“ fälschlich anschlagen
-  if (question.toLowerCase().split(/[^a-zäöüß]+/).some(w => w.startsWith(answer))) {
+  if (questionRevealsAnswer(question, typ, answer)) {
     throw new QuizReject("Die Frage verrät die Antwort.");
   }
-  return { typ, question, answer, options: shuffle(options), errors };
+  return { typ, question, answer, options: typ === "anzahl" ? options.sort((a, b) => a - b) : shuffle(options), errors };
 }
 
 function hideQuiz() {
@@ -2164,7 +2210,7 @@ async function buildQuiz() {
   try {
     const quiz = await fetchQuiz(apiKey, currentRawText, quizAsked, onStage);
     if (token !== quizToken) return;
-    quizAsked.push({ frage: quiz.question, antwort: quiz.answer });
+    quizAsked.push({ frage: quiz.question, antwort: quiz.answer, typ: quiz.typ });
     renderQuiz(quiz);
     checked.textContent = "✓ geprüft";
     checked.title = `Blind gegengeprüft: Die Antwort steht eindeutig im Text. Modell: ${activeModel()}` +
@@ -2207,10 +2253,13 @@ function renderQuiz(quiz) {
     if (quiz.typ === "farbe") {
       body.className = "qopt-body";
       body.innerHTML = blobSVG(QUIZ_COLORS[key], i + 1);
+    } else if (quiz.typ === "anzahl") {
+      body.className = "qopt-body";
+      body.innerHTML = numberSVG(key, QUIZ_NUMBERS[key]);
     } else {
       body.className = "qopt-body animal";
       body.style.setProperty("--bg", QUIZ_ANIMAL_BG[i % QUIZ_ANIMAL_BG.length]);
-      body.textContent = QUIZ_ANIMALS[key];
+      body.textContent = QUIZ_TYPES[quiz.typ].items[key];
     }
     idle.appendChild(body);
     btn.append(bubble, idle);
@@ -2313,15 +2362,9 @@ function isDarkColor(hex) {
   return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) < 90;
 }
 
-function blobSVG(fill, seed) {
-  const ink = isDarkColor(fill) ? "#fff" : "#2a2230";
-  const edge = "rgba(0,0,0,.2)";
-  return `<svg viewBox="0 0 120 120" aria-hidden="true">
-    <ellipse cx="44" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
-    <ellipse cx="76" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
-    <path d="${blobPath(seed)}" fill="${fill}" stroke="${edge}" stroke-width="3"/>
-    <ellipse cx="38" cy="34" rx="10" ry="5.5" fill="#fff" opacity=".55" transform="rotate(-30 38 34)"/>
-    <g class="eye"><circle cx="45" cy="54" r="13" fill="#fff" stroke="#2a2230" stroke-width="2.5"/><circle class="pupil" cx="45" cy="54" r="6" fill="#1d1d24"/></g>
+// Gesicht mit allen drei Stimmungen (normal / richtig / falsch) – per CSS umgeschaltet
+function faceSVG(ink) {
+  return `<g class="eye"><circle cx="45" cy="54" r="13" fill="#fff" stroke="#2a2230" stroke-width="2.5"/><circle class="pupil" cx="45" cy="54" r="6" fill="#1d1d24"/></g>
     <g class="eye"><circle cx="76" cy="52" r="11" fill="#fff" stroke="#2a2230" stroke-width="2.5"/><circle class="pupil" cx="76" cy="52" r="5" fill="#1d1d24"/></g>
     <path class="eye-happy" d="M35 56 Q45 44 55 56 M67 54 Q76 43 85 54" fill="none" stroke="${ink}" stroke-width="4" stroke-linecap="round"/>
     <path class="brows" d="M34 40 L52 34 M86 38 L69 33" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
@@ -2330,7 +2373,37 @@ function blobSVG(fill, seed) {
     <path class="mouth-normal" d="M50 74 Q61 85 72 74" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
     <path class="mouth-happy" d="M45 70 Q61 96 77 70 Z" fill="#5a1a2a" stroke="${ink}" stroke-width="3" stroke-linejoin="round"/>
     <path class="mouth-sad" d="M48 82 Q54 76 60 82 Q66 88 72 82" fill="none" stroke="${ink}" stroke-width="3.5" stroke-linecap="round"/>
-    <path class="sweat" d="M95 30 Q101 40 95 44 Q89 40 95 30 Z" fill="#8fd3ff" stroke="#3b8fd0" stroke-width="2"/>
+    <path class="sweat" d="M95 30 Q101 40 95 44 Q89 40 95 30 Z" fill="#8fd3ff" stroke="#3b8fd0" stroke-width="2"/>`;
+}
+
+function blobSVG(fill, seed) {
+  const ink = isDarkColor(fill) ? "#fff" : "#2a2230";
+  const edge = "rgba(0,0,0,.2)";
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <ellipse cx="44" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <ellipse cx="76" cy="108" rx="11" ry="7" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <path d="${blobPath(seed)}" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <ellipse cx="38" cy="34" rx="10" ry="5.5" fill="#fff" opacity=".55" transform="rotate(-30 38 34)"/>
+    ${faceSVG(ink)}
+  </svg>`;
+}
+
+/* ── Zahlen-Figuren: dicke Ziffer mit Füßchen und demselben Gesicht ── */
+function numberSVG(n, fill) {
+  const ink = isDarkColor(fill) ? "#fff" : "#2a2230";
+  const edge = "rgba(0,0,0,.22)";
+  const two = n.length > 1;
+  return `<svg viewBox="0 0 120 120" aria-hidden="true">
+    <ellipse cx="45" cy="112" rx="10" ry="6" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <ellipse cx="75" cy="112" rx="10" ry="6" fill="${fill}" stroke="${edge}" stroke-width="3"/>
+    <g font-family="Nunito, sans-serif" font-weight="800" font-size="${two ? 76 : 116}" text-anchor="middle"
+       letter-spacing="${two ? 6 : 0}" stroke-linejoin="round">
+      <!-- äußere Kontur, dann dieselbe Ziffer mit dickem Strich in Füllfarbe = pummelige Zahl -->
+      <text x="60" y="${two ? 98 : 106}" fill="${fill}" stroke="${edge}" stroke-width="${two ? 14 : 20}">${n}</text>
+      <text x="60" y="${two ? 98 : 106}" fill="${fill}" stroke="${fill}" stroke-width="${two ? 8 : 14}">${n}</text>
+    </g>
+    <ellipse cx="44" cy="30" rx="8" ry="4.5" fill="#fff" opacity=".5" transform="rotate(-30 44 30)"/>
+    <g transform="translate(60 ${two ? 52 : 50}) scale(.78) translate(-60 -60)">${faceSVG(ink)}</g>
   </svg>`;
 }
 
