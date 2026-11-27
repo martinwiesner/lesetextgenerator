@@ -1773,8 +1773,10 @@ async function callAI(apiKey, opts) {
 /* Die KI bewertet die Kandidaten. Fällt sie aus, gewinnt der erste
    Kandidat – die Auswahl darf die Generierung nie blockieren. */
 async function judgeVariants(apiKey, candidates) {
+  const target = parseInt(document.getElementById("textlen").value, 10);
+  const limit  = Math.round(target * LENGTH_TOLERANCE);
   const texts = candidates
-    .map((c, i) => `TEXT ${i+1}:\n${c.text}`)
+    .map((c, i) => `TEXT ${i+1} (${countWords(c.text)} Wörter):\n${c.text}`)
     .join("\n\n---\n\n");
 
   const prompt = `Du bist erfahrene Grundschullehre:in und beurteilst Kindergeschichten.
@@ -1786,8 +1788,10 @@ BEWERTE NUR NACH:
 3. Lebendigkeit: klingt erzählt statt konstruiert, Dialoge mit Witz, konkrete Bilder statt Floskeln.
 
 BEWERTE AUSDRÜCKLICH NICHT:
-- Rechtschreibung, verwendete Laute, Wort- oder Textlänge. Das wird anschließend automatisch korrigiert und darf die Auswahl nicht beeinflussen.
+- Rechtschreibung und verwendete Laute. Das wird anschließend automatisch korrigiert und darf die Auswahl nicht beeinflussen.
 - Bravheit oder Vollständigkeit. Ein kurzer starker Text schlägt einen langen braven.
+
+LÄNGE: Erlaubt sind höchstens ${limit} Wörter. Ein Text darüber müsste neu geschrieben werden – wähle ihn nur, wenn er klar besser ist als alle Texte innerhalb der Länge.
 
 Bei Gleichstand gewinnt der originellere Text.
 
@@ -1942,7 +1946,7 @@ ERLAUBTE LAUTE (vollständige Liste): ${soundList}
 Verbotene Beispiele: ${getExampleForbidden()}
 Großbuchstaben der erlaubten Laute sind ok (Nomen). Doppelte Konsonanten (nn, mm, tt) erlaubt wenn der Einzellaut erlaubt ist.
 Kein Wort länger als ${wordLen} Buchstaben. Kurze Sätze, viel Dialog.
-TEXTLÄNGE: HÖCHSTENS ${textLen} Wörter (gut: ${Math.round(textLen * 0.8)}–${textLen}). Das ist eine harte Obergrenze – lieber etwas kürzer als zu lang. Plane die Geschichte so knapp, dass sie in diese Länge passt, statt sie auszuschmücken.
+TEXTLÄNGE: HÖCHSTENS ${textLen} Wörter (gut: ${Math.round(textLen * 0.8)}–${textLen}), das sind etwa ${sentenceTarget(textLen)} kurze Sätze. Das ist eine harte Obergrenze – lieber etwas kürzer als zu lang. Plane die Geschichte von Anfang an so knapp: eine Idee, wenig Nebenhandlung, zügig zur Pointe.
 Schreibe JEDES Wort normal am Stück, NIEMALS mit Bindestrich getrennt (also "abgehoben", nicht "ab-ge-ho-ben").
 
 ${humorType.prompt ? `\n${humorType.prompt}\n` : ""}
@@ -1979,7 +1983,7 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
       }));
     }
     if (isFirstGeneration) {
-      text = await enforceLength(apiKey, text, parseInt(textLen, 10), soundList, wordLen);
+      text = await enforceLength(apiKey, text, parseInt(textLen, 10), prompt);
     }
     currentRawText = text;
 
@@ -2014,41 +2018,42 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
 
 /* ══════════════════════════════════════════
    TEXTLÄNGE
-   Die KI überzieht die Wortvorgabe gern deutlich. Deshalb wird nach dem
-   Erzeugen gezählt und ein zu langer Text gezielt gekürzt – bevor die
-   Lautkorrektur läuft, damit sie nicht an später gestrichenen Wörtern arbeitet.
+   Die KI überzieht die Wortvorgabe gern. Ein fertiges Stück nachträglich
+   zusammenzustreichen zerstört aber oft die Handlung. Deshalb wird ein zu
+   langer Text NEU und knapper geschrieben (gleicher Auftrag, strengere
+   Längenansage) – und nur übernommen, wenn er wirklich kürzer und nicht
+   zu dünn ist. Das passiert vor der Lautkorrektur.
 ══════════════════════════════════════════ */
-const LENGTH_TOLERANCE = 1.15;   // bis 15 % über der Vorgabe wird nicht gekürzt
+const LENGTH_TOLERANCE = 1.15;   // bis 15 % über der Vorgabe wird nichts neu geschrieben
 
 function countWords(text) {
   return (text.match(/[a-zA-ZäöüÄÖÜß]+/g) || []).length;
 }
 
-async function enforceLength(apiKey, text, target, soundList, wordLen) {
-  const limit = Math.round(target * LENGTH_TOLERANCE);
-  for (let i = 0; i < 2 && countWords(text) > limit; i++) {
-    const n = countWords(text);
-    setStatus(`Text hat ${n} statt höchstens ${target} Wörter – kürze …`, "info");
-    try {
-      const shorter = stripStrayHyphens(await callAI(apiKey, {
-        max_tokens: 600, temperature: 0.4,
-        messages: [{ role:"user", content:
-`Kürze diesen Lesetext für Erstleser auf HÖCHSTENS ${target} Wörter (jetzt sind es ${n}).
-- Streiche Nebensächliches und fasse zusammen. Die Handlung bleibt verständlich, das Ende bzw. die Pointe bleibt erhalten.${quizEnabled ? "\n- Wichtige Details (Farbe, Tier, Anzahl, Gegenstand) bleiben drin." : ""}
-- Nimm möglichst nur Wörter, die schon im Text stehen. Neue Wörter nur mit diesen Lauten: ${soundList}. Kein Wort länger als ${wordLen} Buchstaben.
-- Zeilenumbrüche wie im Original, keine Bindestriche in Wörtern.
-Gib NUR den gekürzten Text zurück, ohne Kommentar.
+// Erstleser-Sätze haben etwa 5–6 Wörter; Satzzahlen hält die KI zuverlässiger ein als Wortzahlen
+function sentenceTarget(words) {
+  return Math.max(3, Math.round(words / 6));
+}
 
-Text:
-${text}` }]
+async function enforceLength(apiKey, text, target, prompt) {
+  const limit = Math.round(target * LENGTH_TOLERANCE);
+  let best = text;
+  for (let i = 0; i < 2 && countWords(best) > limit; i++) {
+    const n = countWords(best);
+    setStatus(`Text hat ${n} statt höchstens ${target} Wörter – schreibe eine knappere Fassung …`, "info");
+    try {
+      const fresh = stripStrayHyphens(await callAI(apiKey, {
+        max_tokens: 600, temperature: 0.8,
+        messages: [{ role:"user", content: `${prompt}
+
+ACHTUNG LÄNGE: Ein erster Versuch hatte ${n} Wörter – viel zu lang. Schreibe eine NEUE Geschichte, die von Anfang an knapp geplant ist: höchstens ${target} Wörter, etwa ${sentenceTarget(target)} kurze Sätze. Lieber eine kleine Idee, die sauber aufgeht, als eine große, die gequetscht wird. Die Geschichte muss trotzdem vollständig und verständlich sein, mit Pointe am Ende.` }]
       }));
-      const m = countWords(shorter);
-      // Nur übernehmen, wenn wirklich kürzer und nicht zu einem Stummel zusammengestrichen
-      if (m >= n || m < target * 0.5) break;
-      text = shorter;
-    } catch { break; }   // Kürzen ist ein Extra – Fehler hier dürfen die Generierung nicht stoppen
+      const m = countWords(fresh);
+      // Nur übernehmen, wenn kürzer und keine dürre Rumpfgeschichte
+      if (m < countWords(best) && m >= target * 0.5) best = fresh;
+    } catch { break; }   // Längenkorrektur ist ein Extra – Fehler dürfen die Generierung nicht stoppen
   }
-  return text;
+  return best;
 }
 
 function namesPrompt() {
