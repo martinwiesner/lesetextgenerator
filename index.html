@@ -787,7 +787,7 @@ Geduld: Muster 1 → Muster 2 → ÜBERRASCHUNG.`
 Erwachsener (Mutter/Lehrer/Vater) fragt oder kritisiert. Das Kind antwortet mit seiner eigenen Logik und hat am Ende eindeutig Recht.
 Beispiel-Prinzip: Lehrer: "Warum so schmutzig?" – Kind: "Ich bin halt näher am Boden als Sie!"
 → Das Kind ist NICHT frech, sondern absolut logisch. Der Erwachsene hat keine Antwort mehr.
-Kurzer Schlagabtausch. Letzte Zeile gehört dem Kind.`
+Kurzer Schlagabtausch in ganzen Sätzen. Letzte Zeile gehört dem Kind.`
   }
 ];
 let activeHumorId = "schlagfertig";   // Standard: Kind schlägt Erwachsenen
@@ -1705,7 +1705,7 @@ ${errDetails}
 WICHTIG:
 - Gib NUR den korrigierten Text zurück, keine Erklärung.
 - Verändere Satzbau, Witzmechanismus und alle anderen Wörter NICHT.
-- Wenn kein geeignetes Ersatzwort existiert, lasse das Wort weg oder forme den Satz minimal um.
+- Wenn kein geeignetes Ersatzwort existiert, forme den ganzen Satz so um, dass er vollständig, grammatisch richtig und natürlich bleibt. Streiche NIE einfach ein Wort, sodass ein abgehackter Satz übrig bleibt.
 
 Originaltext:
 ${prevText}`;
@@ -1715,6 +1715,17 @@ ${prevText}`;
 // Workaround für die Wortlängen-Vorgabe. Für Erstleser ist das nur verwirrend – die Silbenfarben
 // übernehmen diese Aufgabe bereits. Bindestriche zwischen zwei Buchstaben werden daher entfernt,
 // das Wort wandert wieder zusammen (und wird ggf. regulär als zu lang erkannt und korrigiert).
+/* Säubert einen erzeugten Lesetext: Bindestriche in Wörtern weg und Zeilen entfernen,
+   in denen die KI trotz Anweisung eine Quiz-/Lesefrage an den Leser anhängt –
+   die Lesefrage stellt die App separat. */
+function cleanStory(text) {
+  return stripStrayHyphens(text)
+    .split("\n")
+    .filter(l => !/^\s*[*_]*\s*(lese)?(frage|quiz|rätsel|aufgabe)\s*[*_]*\s*[:?]/i.test(l))
+    .join("\n")
+    .trim();
+}
+
 function stripStrayHyphens(text) {
   return text.replace(/([a-zA-ZäöüÄÖÜß])-(?=[a-zA-ZäöüÄÖÜß])/g, "$1");
 }
@@ -1828,7 +1839,7 @@ async function generateVariants(apiKey, prompt, n) {
   const candidates = results
     .filter(r => r.status === "fulfilled")
     .map(r => {
-      const text = stripStrayHyphens(r.value);
+      const text = cleanStory(r.value);
       return { text, errors: validateText(text), reason: "" };
     });
 
@@ -1946,6 +1957,7 @@ ERLAUBTE LAUTE (vollständige Liste): ${soundList}
 Verbotene Beispiele: ${getExampleForbidden()}
 Großbuchstaben der erlaubten Laute sind ok (Nomen). Doppelte Konsonanten (nn, mm, tt) erlaubt wenn der Einzellaut erlaubt ist.
 Kein Wort länger als ${wordLen} Buchstaben. Kurze Sätze, viel Dialog.
+SPRACHE: Jeder Satz ist ein vollständiger, grammatisch richtiger deutscher Satz mit Verb – kein Telegrammstil, keine Ein-Wort-Sätze wie „Nass?“ oder „Bad voll.“. Dialoge stehen in Anführungszeichen mit Redebegleitsatz („…“, sagt Mama.) – NICHT im Drehbuchformat „Name: Text“. Die Geschichte muss für ein Kind ohne Erklärung verständlich sein.
 TEXTLÄNGE: HÖCHSTENS ${textLen} Wörter (gut: ${Math.round(textLen * 0.8)}–${textLen}), das sind etwa ${sentenceTarget(textLen)} kurze Sätze. Das ist eine harte Obergrenze – lieber etwas kürzer als zu lang. Plane die Geschichte von Anfang an so knapp: eine Idee, wenig Nebenhandlung, zügig zur Pointe.
 Schreibe JEDES Wort normal am Stück, NIEMALS mit Bindestrich getrennt (also "abgehoben", nicht "ab-ge-ho-ben").
 
@@ -1956,7 +1968,7 @@ ${useSchema ? `\nZUSÄTZLICHES GERÜST${humorType.prompt ? " (neben dem Witzmech
 1. WUNSCH/PROBLEM: Die Hauptfigur will etwas oder hat gleich zu Anfang ein Problem.
 2. HINDERNIS: Ein Versuch klappt nicht, oder es gibt ein Hindernis.
 3. LÖSUNG/POINTE: Die Auflösung am Ende ist zugleich die Pointe${humorType.prompt ? " des Witzmechanismus" : ""}.` : ""}
-${quizEnabled ? `\nLESEFRAGE: Nach dem Text folgt eine Verständnisfrage, die man mit einer FARBE, einem TIER, einer ANZAHL oder einem DING beantwortet. Baue deshalb ein bis zwei eindeutige, für die Handlung wichtige Details ein – z. B. eine Figur ist ein bestimmtes Tier, etwas hat eine klare Farbe, es gibt eine genannte Anzahl (drei Äpfel) oder ein wichtiger Gegenstand bzw. etwas zu essen.` : ""}
+${quizEnabled ? `\nLESEFRAGE: Die App stellt NACH dem Text selbst eine Verständnisfrage – schreibe diese Frage NICHT in den Text (keine Zeile wie „Frage: …“, keine Quizfrage an den Leser). Die Verständnisfrage wird mit einer FARBE, einem TIER, einer ANZAHL oder einem DING beantwortet. Baue deshalb ein bis zwei eindeutige, für die Handlung wichtige Details ein – z. B. eine Figur ist ein bestimmtes Tier, etwas hat eine klare Farbe, es gibt eine genannte Anzahl (drei Äpfel) oder ein wichtiger Gegenstand bzw. etwas zu essen.` : ""}
 
 AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
     prompt = prompt.replace(/\n{3,}/g, "\n\n");   // Leerzeilen aus leeren Bausteinen entfernen
@@ -1977,7 +1989,7 @@ AUSGABE: Nur der fertige Text, kein Kommentar, keine Erklärung.`;
       activeVariant = winner;
       text = candidates[winner].text;
     } else {
-      text = stripStrayHyphens(await callAI(apiKey, {
+      text = cleanStory(await callAI(apiKey, {
         max_tokens: 600, temperature: 0.8,
         messages: [{ role:"user", content: prompt }]
       }));
@@ -2042,11 +2054,11 @@ async function enforceLength(apiKey, text, target, prompt) {
     const n = countWords(best);
     setStatus(`Text hat ${n} statt höchstens ${target} Wörter – schreibe eine knappere Fassung …`, "info");
     try {
-      const fresh = stripStrayHyphens(await callAI(apiKey, {
+      const fresh = cleanStory(await callAI(apiKey, {
         max_tokens: 600, temperature: 0.8,
         messages: [{ role:"user", content: `${prompt}
 
-ACHTUNG LÄNGE: Ein erster Versuch hatte ${n} Wörter – viel zu lang. Schreibe eine NEUE Geschichte, die von Anfang an knapp geplant ist: höchstens ${target} Wörter, etwa ${sentenceTarget(target)} kurze Sätze. Lieber eine kleine Idee, die sauber aufgeht, als eine große, die gequetscht wird. Die Geschichte muss trotzdem vollständig und verständlich sein, mit Pointe am Ende.` }]
+ACHTUNG LÄNGE: Ein erster Versuch hatte ${n} Wörter – viel zu lang. Schreibe eine NEUE Geschichte, die von Anfang an knapp geplant ist: höchstens ${target} Wörter, etwa ${sentenceTarget(target)} kurze Sätze. Lieber eine kleine Idee, die sauber aufgeht, als eine große, die gequetscht wird. Kürze über die Handlung (weniger Ereignisse), NICHT über die Sätze: keine Telegrammsätze, jeder Satz vollständig. Die Geschichte muss verständlich sein, mit Pointe am Ende.` }]
       }));
       const m = countWords(fresh);
       // Nur übernehmen, wenn kürzer und keine dürre Rumpfgeschichte
